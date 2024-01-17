@@ -70,7 +70,7 @@ print("Creating polygons for visualization")
 MC.well7_DLS$polygons <- supercell_metaspots_shape(MC = MC.well7_DLS,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
 print("Done")
 SpatialDimPlotSC(original_coord = spotPosition ,MC = MC.well7_DLS,
-                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_",g),polygons_col = "polygons" ,meta_data = well7.md , pt_size = 1,concavity = 2)+NoLegend()
+                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_",g),polygons_col = "polygons" ,meta_data = well7.md )+NoLegend()
 
 MC.well7_DLS.spl <- split_unconnected(MC.well7_DLS)
 well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7_DLS.spl$membership %>% as.character()
@@ -78,8 +78,8 @@ well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7_DLS.spl$membership %>% as.c
 MC.well7_DLS.spl$Main_molecular_cell_type <- supercell_assign(clusters = well7.md $Main_molecular_cell_type,supercell_membership = MC.well7_DLS.spl$membership,method = "absolute")
 
 MC.well7_DLS.spl$polygons <- supercell_metaspots_shape(MC.well7_DLS.spl,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
-plot(SpatialDimPlotSC(spotPosition ,MC.well7_DLS.spl,
-                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_spl_",g),polygons_col = "polygons" ,meta_data = well7.md , concavity = 2)+NoLegend()+ theme(plot.background = element_rect(fill = 'black'),panel.background = element_rect(fill = 'black'),panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+SpatialDimPlotSC(spotPosition ,MC.well7_DLS.spl,
+                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_spl_",g),polygons_col = "polygons" ,meta_data = well7.md )+NoLegend()+ theme(plot.background = element_rect(fill = 'black'),panel.background = element_rect(fill = 'black'),panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 ```
 
 ## Create Seurat object from metaspot object
@@ -94,9 +94,7 @@ MC.ge <- superspot_GE(MC = MC.well7_DLS.spl,
 MC.seurat <- supercell_2_Seuratv5(
   SC.GE = MC.ge, 
   SC = MC.well7_DLS.spl, 
-  fields = c("Main_molecular_cell_type"),
-  var.genes = MC.well7_DLS.spl$genes.use,
-  N.comp = 30,is.log.normalized = F,do.center = F,do.scale = F
+  fields = c("Main_molecular_cell_type")
 )
 
 MC.seurat <- NormalizeData(MC.seurat)
