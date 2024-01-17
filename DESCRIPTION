@@ -1,0 +1,59 @@
+Package: SuperSpot
+Title: Simplification of spatial transcriptomic data by merging together similar spots
+Version: 0.0.0.9000
+Author: Matei Teleman
+Maintainer: The package maintainer <matei.teleman@unil.ch>
+Description: Aggregates spatial transcriptomic data into metaspots dataset by merging together  very similar spots. 
+License: file LICENSE
+Encoding: UTF-8
+Imports: 
+    igraph,
+    RANN,
+    WeightedCluster,
+    corpcor,
+    weights,
+    Hmisc,
+    Matrix,
+    matrixStats,
+    plyr,
+    irlba,
+    grDevices,
+    patchwork,
+    gtools,
+    ggplot2,
+    umap,
+    entropy,
+    Rtsne,
+    bluster,
+    dbscan,
+    cowplot,
+    scales,
+    plotfunctions,
+    proxy,
+    methods,
+    rlang,
+    Seurat,
+    data.table,
+    foreach,
+    doParallel,
+    concaveman,
+    parallelDist,
+    pbapply,
+    pliman,
+    tidyr,
+    tidyverse
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Suggests:
+    SingleCellExperiment,
+    SummarizedExperiment,
+    BSgenome.Hsapiens.UCSC.hg38,
+    BSgenome.Hsapiens.UCSC.hg19,
+    scater,
+    knitr,
+    rmarkdown,
+    remotes,
+    velocyto.R,
+Depends: 
+    R (>= 4.3.1)
+VignetteBuilder: knitr

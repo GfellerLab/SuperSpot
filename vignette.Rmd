@@ -1,0 +1,133 @@
+---
+title: "Vignette SuperSpot"
+author: "Matei Teleman"
+date: "2024-01-15"
+output: html_document
+---
+
+## Import libraries
+```{r}
+library(Seurat)
+#library(SuperSpot)
+library(SuperCell)
+library(tidyr)
+library(tidyverse)
+library(igraph)
+```
+
+```{r}
+source("/Users/admin/Documents/GitHub/SuperSpot/R/basicSTplot.R")
+source("/Users/admin/Documents/GitHub/SuperSpot/R/SCimplify_SpatialDLS.R")
+```
+
+
+## Import dataset
+```{r}
+well7.mtx <- read_csv("~/Downloads/well7_5raw_expression_pd.csv")%>% column_to_rownames("GENE")
+well7.mtx[1:5,1:5]
+
+md <- read_csv("~/Downloads/metadata.csv")
+md[1:5,1:5]
+well7.md <- md[md$NAME %in% colnames(well7.mtx) == T,]
+well7.md[1:5,1:5]
+
+well7.spatial <- read_csv("~/Downloads/well7_5_spatial.csv")
+well7.spatial <- well7.spatial[-1,]
+
+spotPosition <- dplyr::select(well7.spatial,c("NAME","X","Y")) %>% column_to_rownames("NAME")
+colnames(spotPosition) <- c("imagerow","imagecol")
+
+spotPosition$imagerow <- as.numeric(spotPosition$imagerow)
+spotPosition$imagecol <- as.numeric(spotPosition$imagecol)
+spotPosition <- select(spotPosition,c("imagerow","imagecol"))
+```
+
+## Create metaspot object
+```{r}
+g = 10
+n.pc = 5
+k.knn = 16
+
+print("Creating metaspots")
+MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,spotPositions = spotPosition ,
+                                     method_similarity = "1",split_not_connected = T,
+                                     genes.use = rownames(well7.mtx),gamma = i,n.pc = 30,
+                                      method_knn = "1",k.knn = 16,method_normalization = "log_normalize",cell.annotation = well7.md$Main_molecular_cell_type)
+
+print("Done")
+
+well7.md[,str_c("MC_membership_",g)] <- MC.well7_DLS$membership %>% as.character()
+
+method_purity <- c("max_proportion", "entropy")[1]
+MC.well7_DLS$purity <- supercell_purity(
+  clusters = well7.md$Main_molecular_cell_type,
+  supercell_membership = MC.well7_DLS$membership, 
+  method = method_purity
+)
+
+
+print(str_c("purity is ",MC.well7_DLS$purity))
+
+MC.well7_DLS$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Main_molecular_cell_type,supercell_membership = MC.well7_DLS$membership,method = "absolute")
+
+print("Creating polygons for visualization")
+MC.well7_DLS$polygons <- supercell_metaspots_shape(MC = MC.well7_DLS,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
+print("Done")
+SpatialDimPlotSC(original_coord = spotPosition ,MC = MC.well7_DLS,
+                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_",g),polygons_col = "polygons" ,meta_data = well7.md , pt_size = 1,concavity = 2)+NoLegend()
+
+MC.well7_DLS.spl <- split_unconnected(MC.well7_DLS)
+well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7_DLS.spl$membership %>% as.character()
+
+MC.well7_DLS.spl$Main_molecular_cell_type <- supercell_assign(clusters = well7.md $Main_molecular_cell_type,supercell_membership = MC.well7_DLS.spl$membership,method = "absolute")
+
+MC.well7_DLS.spl$polygons <- supercell_metaspots_shape(MC.well7_DLS.spl,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
+plot(SpatialDimPlotSC(spotPosition ,MC.well7_DLS.spl,
+                    sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_spl_",g),polygons_col = "polygons" ,meta_data = well7.md , concavity = 2)+NoLegend()+ theme(plot.background = element_rect(fill = 'black'),panel.background = element_rect(fill = 'black'),panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+```
+
+## Create Seurat object from metaspot object
+```{r}
+MC_centroids <- supercell_spatial_centroids(MC.well7_DLS.spl,spotPositions = spotPosition)
+
+MC.ge <- superspot_GE(MC = MC.well7_DLS.spl,
+  ge = well7.mtx %>% as.matrix(),
+  groups = as.numeric(MC.well7_DLS.spl$membership)
+)
+
+MC.seurat <- supercell_2_Seuratv5(
+  SC.GE = MC.ge, 
+  SC = MC.well7_DLS.spl, 
+  fields = c("Main_molecular_cell_type"),
+  var.genes = MC.well7_DLS.spl$genes.use,
+  N.comp = 30,is.log.normalized = F,do.center = F,do.scale = F
+)
+
+MC.seurat <- NormalizeData(MC.seurat)
+
+MC.seurat <- ScaleData(MC.seurat)
+
+MC.seurat <- FindVariableFeatures(MC.seurat)
+
+MC.seurat <- RunPCA(MC.seurat)
+
+MC.seurat <- RunUMAP(MC.seurat, dims = 1:30)
+
+DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")
+```
+
+## Perform downstream analyses
+```{r}
+Idents(MC.seurat) <- "Main_molecular_cell_type" 
+levels(MC.seurat) <- sort(levels(MC.seurat))
+
+VlnPlot(MC.seurat,"nFeature_RNA")+NoLegend()
+
+well7.mc.markers <-  FindAllMarkers(MC.seurat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25 ) %>% filter(p_val_adj < 0.05)
+well7.mc.top.markers <- well7.mc.markers %>%
+   group_by(cluster) %>%
+    slice_max(n = 5, order_by = avg_log2FC)
+
+DotPlot(MC.seurat,features = well7.mc.top.markers$gene %>% unique()) + RotatedAxis()
+```
+

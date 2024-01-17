@@ -1,15 +1,51 @@
+#' Creation of the KNN graph to links the spots based on the spatial proximity
+#'
+#' This function builds the KNN graph to links the spots based on the spatial proximity
+#'
+#'
+#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param k.spots number of neighborhoods to take into account when choosing the second method to build the KNN
+#' @param countMatrix raw matrix of the gene expression for each spot
+#' @param n.pc number of principal components to use from PCA
+#' @param method_similarity method to compute transcriptional similarity from distance
+#' \itemize{
+#'   \item "1" - similarity = 1 - (distance/max(distance))
+#'   \item "2" - similarity = exp(-(distance^2)/sigma)
+#'   \item "3" - similarity = proxy::pr_dist2simil(distance)
+#' }
+#' @param method_knn method to compute the KNN
+#' \itemize{
+#'   \item "1" - KNN is built with RANN::nn2() function (default)
+#'   \item "2" - KNN is built by computing every distances between each spot and filtered by choosing the number of neighborhoods to take into account
+#' }
+#' @param k.knn numbers of neighboring spots to compute for each spot
+#' @param sigs parameter when computing the transcriptional similarity with method "2"
+#' @param method_normalization method for normalization of the raw count matrix
+#' \itemize{
+#'   \item "log_normalize" for a Seurat Log Normalization
+#'   \item "SCT" for a Seurat SCT Normalization
+#' }
+#' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
+#' @param split_annotation split or not the spots in the KNN graph based on their annotation
+#' @param split_vector vector of the spots annotations on which the KNN will be split
+#' 
+#' @return a list with components
+#' \itemize{
+#'   \item graph - an igraph graph
+#'   \item so - a seurat object
+#' }
+#'
+#' @export
+#'
+#'
+#'
+
 neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_similarity, method_knn, k.knn, sigs,
-                           method_normalization,split_not_connected,split_annotation = NULL,split_vector){
+                           method_normalization,split_not_connected,split_annotation,split_vector){
   if (method_knn == "1"){
-    #coord_assay <- Seurat::CreateAssayObject(counts = t(spotPositions))
-    #coord_neighbors <- Seurat::FindNeighbors(coord_assay,k.param = k.knn)
-    #coord_knn_am <- coord_neighbors$nn
-    #spot.graph <- graph.adjacency(coord_knn_am,mode = "undirected")
     print(paste0("Building KNN graph with nn2"))
     nn2.res <- RANN::nn2(data = spotPositions,k = k.knn+1)
     if (split_not_connected == TRUE){
-      
-      #min_dist <- min(nn2.res$nn.dists[,2:k.knn])
       min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F)[3]
       print(paste0("Neighbors with distance > ",min_dist, " are removed"))
       plot(ggplot(data = tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
@@ -38,33 +74,20 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
       countMatrix <- countMatrix[,cell_type.id]
     }
     
-    #grah.matrix <- as_adj(spot.graph,sparse = F)
-    #grah.matrix[grah.matrix < 4 ] <- 0
-    #spot.graph <- graph_from_adjacency_matrix(grah.matrix,mode = "undirected")
     max_gamma <- (nrow(spotPositions)/igraph::components(spot.graph)$no)
     print(paste0("Maximum gamma is ",max_gamma))
     print(paste0("Done"))
     V(spot.graph)$x <- spotPositions$imagecol
     V(spot.graph)$y <- -spotPositions$imagerow
-    #plot(spot.graph,
-    #     layout = matrix(c(V(spot.graph)$x, V(spot.graph)$y), ncol = 2),
-    #     vertex.label.cex = 0.1,
-    #     vertex.size = 1,
-    #     edge.arrow.size = 0.7,
-    #     main = "Graph with Custom X and Y Coordinates")
   }
   else if (method_knn == "2"){
     print(paste0("Building KNN graph by DLS"))
     print(paste0("Computing distances between spots"))
     distCoord <- parallelDist::parDist(spotPositions %>% as.matrix())
     min.dist <- min(distCoord)
-    #distCoord2 <- distCoord
     distCoord[distCoord > k.spots*round(min.dist)] <- 0
     distCoord[distCoord >0] <- 1
-    #print(rownames(distCoord))
     spot.graph <- graph.adjacency(distCoord %>% as.matrix(),mode = "undirected")
-    #print(E(spot.graph))
-    #print(V(spot.graph))
     print(paste0("Done"))
   }
   
@@ -89,18 +112,12 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     so <- SCTransform(so, new.assay.name = "SCT" , assay = "RNA",verbose = F)
     print(paste0("Done"))
     print(paste0("Running PCA"))
-    #if (max_gamma != 1){
     so <- RunPCA(so, assay = "SCT",verbose = F)
     pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
-    #}
-    #else {
-    #  pca_matrix <- matrix(0,ncol(countMatrix),n.pc)
-    #}
   }
   
   print(paste0("Done"))
   print(paste0("Computing PCA dist for each edge"))
-  #pb <- 
   pca_dist <- pbapply::pbapply(igraph::get.edgelist(spot.graph),
                     1 ,
                     function(x){parallelDist::parDist(pca_matrix[x,])})
@@ -123,22 +140,97 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     print(paste0("Done"))
   }
   print(paste0("Returning graph with PCA similarity as weight"))
-  #print(length(igraph::E(spot.graph)$weight))
-  #print(length(pca_similarity))
   igraph::E(spot.graph)$weight <- pca_similarity
-  #print(igraph::E(spot.graph)$weight)
-  #hist(igraph::E(spot.graph)$weight)
-  #hist(pca_similarity)
   return_list <- list("graph" = spot.graph, "seurat.object" = so)
   return(return_list)
 }
 
+#' Detection of metaspots with the SuperSpot approach
+#'
+#' This function detects metaspots  from spatial transcriptomics data
+#'
+#'
+#' @param X raw count matrix with rows to be genes and cols to be cells
+#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param k.spots number of neighborhoods to take into account when choosing the second method to build the KNN
+#' @param n.pc number of principal components to use from PCA
+#' @param method_similarity method to compute transcriptional similarity from distance
+#' \itemize{
+#'   \item "1" - similarity = 1 - (distance/max(distance))
+#'   \item "2" - similarity = exp(-(distance^2)/sigma)
+#'   \item "3" - similarity = proxy::pr_dist2simil(distance)
+#' }
+#' @param method_knn method to compute the KNN
+#' \itemize{
+#'   \item "1" - KNN is built with RANN::nn2() function (default)
+#'   \item "2" - KNN is built by computing every distances between each spot and filtered by choosing the number of neighborhoods to take into account
+#' }
+#' @param k.knn numbers of neighboring spots to compute for each spot
+#' @param sigs parameter when computing the transcriptional similarity with method "2"
+#' @param method_normalization method for normalization of the raw count matrix
+#' \itemize{
+#'   \item "log_normalize" for a Seurat Log Normalization
+#'   \item "SCT" for a Seurat SCT Normalization
+#' }
+#' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
+#' @param split_annotation split or not the spots in the KNN graph based on their annotation
+#' @param split_vector vector of the spots annotations on which the KNN will be split
+#' @param genes.use a vector of genes used to compute PCA
+#' @param genes.exclude a vector of genes to be excluded when computing PCA
+#' @param cell.annotation a vector of cell type annotation, if provided, metacells that contain single cells of different cell type annotation will be split in multiple pure metacell (may result in slightly larger numbe of metacells than expected with a given gamma)
+#' @param cell.split.condition a vector of cell conditions that must not be mixed in one metacell. If provided, metacells will be split in condition-pure metacell (may result in significantly(!) larger number of metacells than expected)
+#' @param n.var.genes if \code{"genes.use"} is not provided, \code{"n.var.genes"} genes with the largest variation are used
+#' @param gamma graining level of data (proportion of number of single cells in the initial dataset to the number of metacells in the final dataset)
+#' @param k.knn parameter to compute single-cell kNN network
+#' @param do.scale whether to scale gene expression matrix when computing PCA
+#' @param n.pc number of principal components to use for construction of single-cell kNN network
+#' @param fast.pca use \link[irlba]{irlba} as a faster version of prcomp (one used in Seurat package)
+#' @param do.approx compute approximate kNN in case of a large dataset (>50'000)
+#' @param approx.N number of cells to subsample for an approximate approach
+#' @param block.size number of cells to map to the nearest metacell at the time (for approx coarse-graining)
+#' @param seed seed to use to subsample cells for an approximate approach
+#' @param igraph.clustering clustering method to identify metacells (available methods "walktrap" (default) and "louvain" (not recommended, gamma is ignored)).
+#' @param return.singlecell.NW whether return single-cell network (which consists of approx.N if \code{"do.approx"} or all cells otherwise)
+#' @param return.hierarchical.structure whether return hierarchical structure of metacell
+#' @param return.seurat.object whether return seurat object of spots used to computed PCA
+#' @param ... other parameters of \link{build_knn_graph} function
+#'
+#' @return a list with components
+#' \itemize{
+#'   \item graph.supercells - igraph object of a simplified network (number of nodes corresponds to number of metacells)
+#'   \item membership - assigmnent of each single cell to a particular metacell
+#'   \item graph.singlecells - igraph object (kNN network) of single-cell data
+#'   \item supercell_size - size of metacells (former super-cells)
+#'   \item gamma - requested graining level
+#'   \item N.SC - number of obtained metacells
+#'   \item genes.use - used genes
+#'   \item do.approx - whether approximate coarse-graining was perfirmed
+#'   \item n.pc - number of principal components used for metacells construction
+#'   \item k.knn - number of neighbors to build single-cell graph
+#'   \item k.spots - number of neighborhood used if method_knn was "2"
+#'   \item sigs - sigma parameter used if method_similarity was "2"
+#'   \item method_similarity - used similarity method
+#'   \item method_knn - used KNN method
+#'   \item method_normalization - used normalization method
+#'   \item sc.cell.annotation. - single-cell cell type annotation (if provided)
+#'   \item sc.cell.split.condition. - single-cell split condition (if provided)
+#'   \item SC.cell.annotation. - super-cell cell type annotation (if was provided for single cells)
+#'   \item SC.cell.split.condition. - super-cell split condition (if was provided for single cells)
+#'
+#' }
+#' 
+#' @export
+#'
+#'
+#'
+
+
 SCimplify_SpatialDLS <- function(X,
                                 spotPositions,
                                 k.spots = 1,
-                                method_similarity,
-                                method_knn,
-                                method_normalization,
+                                method_similarity = "3",
+                                method_knn = "1",
+                                method_normalization = "log_normalize",
                                 split_not_connected,
                                 split_annotation = NULL,
                                 split_vector,
@@ -151,7 +243,7 @@ SCimplify_SpatialDLS <- function(X,
                                 gamma = 10,
                                 k.knn = 6,
                                 do.scale = TRUE,
-                                n.pc = 30,
+                                n.pc = 5,
                                 fast.pca = TRUE,
                                 do.approx = FALSE,
                                 approx.N = 20000,
@@ -160,6 +252,7 @@ SCimplify_SpatialDLS <- function(X,
                                 igraph.clustering = c("walktrap", "louvain"),
                                 return.singlecell.NW = TRUE,
                                 return.hierarchical.structure = TRUE,
+                                return.seurat.object = FALSE,
                                 ...){
   
   neighbor_graph.output <- neighbor_graph(spotPositions = spotPositions, k.spots = k.spots,split_not_connected = split_not_connected,
@@ -328,8 +421,7 @@ SCimplify_SpatialDLS <- function(X,
   igraph::V(SC.NW)$size          <- supercell_size
   igraph::V(SC.NW)$sizesqrt      <- sqrt(igraph::V(SC.NW)$size)
   
-  res <- list(seurat.object = neighbor_graph.output$seurat.object,
-              graph.supercells = SC.NW,
+  res <- list(graph.supercells = SC.NW,
               gamma = gamma,
               N.SC = length(unique(membership)),
               membership = membership,
@@ -341,6 +433,8 @@ SCimplify_SpatialDLS <- function(X,
               k.spots = k.spots,
               sigs = sigs,
               method_similarity = method_similarity,
+              method_knn = method_knn,
+              method_normalization = method_normalization,
               sc.cell.annotation. = cell.annotation,
               sc.cell.split.condition. = cell.split.condition
   )
@@ -354,8 +448,26 @@ SCimplify_SpatialDLS <- function(X,
   
   if(igraph.clustering[1] == "walktrap" & return.hierarchical.structure){ res$h_membership <- g.s}
   gc()
+  
+  if(return.seurat.object == TRUE){seurat.object = neighbor_graph.output$seurat.object}
+  
   return(res)
 }
+
+#' Computation of the spatial centroids about metaspots
+#'
+#' This function computes the spatial centroids of metaspots from the coordinates of the original spots
+#'
+#'
+#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' 
+#' @return a dataframe of the centroids coordinates for each metaspot
+#'
+#' @export
+#'
+#'
+#'
 
 
 supercell_spatial_centroids <- function(MC,spotPositions){
@@ -367,86 +479,20 @@ supercell_spatial_centroids <- function(MC,spotPositions){
   return(centroids)
 }
 
-
-split_unconnected <- function(MC){
-  memberships <- MC$membership
-  memberships_tmp <- memberships #%>% as.character()
-  for (m in unique(memberships)[11:20]){
-    #print(m)
-    vertex.id <- which(memberships %in% m)
-    sub_network <- subgraph(MC$graph.singlecell, vertex.id)
-    
-    if (is.connected(sub_network) == FALSE){
-      #plot(sub_network)
-      new_memberships <- components(sub_network,mode = "strong")$membership
-      #dg <- decompose(sub_network)
-      old_memberships <- rep(m,length(vertex.id))
-      updated_memberships <- paste(old_memberships,new_memberships,sep = ".") %>% as.numeric()
-      updated_memberships.chr <- paste(old_memberships,new_memberships,sep = ".")
-      updated_memberships.chr2 <- as.character(updated_memberships)
-      memberships_tmp[vertex.id] <- updated_memberships
-      plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = spotPosition.sb[vertex.id,],mapping = aes(x = imagecol,y = imagerow),color='red')+NoLegend())
-      plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr),mapping = aes(x = imagecol,y = imagerow,color = updated_memberships.chr)) + 
-  ggrepel::geom_label_repel(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr),aes(x = imagecol,y = imagerow,label = updated_memberships.chr),
-                              box.padding   = 0.35, 
-                              point.padding = 0.5,
-                              segment.color = 'grey50') +NoLegend())
-      plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr2),mapping = aes(x = imagecol,y = imagerow,color = updated_memberships.chr2)) + 
-             ggrepel::geom_label_repel(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr2),aes(x = imagecol,y = imagerow,label = updated_memberships.chr2),
-                                       box.padding   = 0.35, 
-                                       point.padding = 0.5,
-                                       segment.color = 'grey50') +NoLegend())
-    }
-    
-  }
-  #MC$membership <- as.integer(memberships_tmp*1000)
-  MC$membership <- memberships_tmp
-  #names(MC$membership) <- names(memberships)
-  MC$supercell_size <- as.vector(table(MC$membership))
-  MC$N.SC <- length(MC$supercell_size)
-  return(MC)
-}
-
-split_unconnected3 <- function(MC){
-  memberships <- MC$membership
-  memberships_tmp <- memberships #%>% as.character()
-  for (m in unique(memberships)){
-    #print(m)
-    vertex.id <- which(memberships %in% m)
-    sub_network <- subgraph(MC$graph.singlecell, vertex.id)
-    
-    if (is.connected(sub_network) == FALSE){
-      #plot(sub_network)
-      new_memberships <- igraph::components(sub_network,mode = "strong")$membership
-      max_membership <- max(memberships_tmp)
-      #print(max_membership)
-      old_memberships <- rep(m,length(vertex.id))
-      updated_memberships <- paste(old_memberships,new_memberships,sep = "") %>% as.numeric()
-      updated_memberships_shifted <- updated_memberships+max_membership
-      updated_memberships.chr2 <- as.character(updated_memberships_shifted)
-      memberships_tmp[vertex.id] <- updated_memberships_shifted
-      #plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = spotPosition.sb[vertex.id,],mapping = aes(x = imagecol,y = imagerow),color='red')+NoLegend())
-      #plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr),mapping = aes(x = imagecol,y = imagerow,color = updated_memberships.chr)) + 
-             #ggrepel::geom_label_repel(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr),aes(x = imagecol,y = imagerow,label = updated_memberships.chr),
-              #                         box.padding   = 0.35, 
-              #                         point.padding = 0.5,
-              #                         segment.color = 'grey50') +NoLegend())
-      #plot(ggplot(spotPosition.sb)+geom_point(aes(x = imagecol,y = imagerow),alpha = 0.1)+geom_point(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr2),mapping = aes(x = imagecol,y = imagerow,color = updated_memberships.chr2)) + 
-      #       ggrepel::geom_label_repel(data = cbind(spotPosition.sb[vertex.id,],updated_memberships.chr2),aes(x = imagecol,y = imagerow,label = updated_memberships.chr2),
-                                       #box.padding   = 0.35, 
-                                       #point.padding = 0.5,
-      #                                 segment.color = 'grey50') +NoLegend())
-    }
-    
-  }
-  #MC$membership <- as.integer(memberships_tmp*1000)
-  MC$membership <- memberships_tmp
-  names(MC$membership) <- names(memberships)
-  MC$supercell_size <- as.vector(table(MC$membership))
-  MC$N.SC <- length(MC$supercell_size)
-  return(MC)
-}
-
+#' Update of the memberships of unconnected components
+#'
+#' This function checks if the spots assigned as a metaspots are connected in the KNN graph and split them by updating their membership
+#'
+#'
+#' @param m given membership
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' 
+#' @return a vector of membership with updated split memberships
+#'
+#' @export
+#'
+#'
+#'
 
 split_membership <- function(m,MC){
   memberships <- MC$membership
@@ -465,7 +511,21 @@ split_membership <- function(m,MC){
   return(memberships[vertex.id])
 }
 
-split_unconnected2 <- function(MC){
+#' Split metaspots that are unconnect in KNN graph
+#'
+#' This function splits metaspots that are unconnect in KNN graph
+#'
+#'
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' 
+#' @return a vector of membership with updated split memberships
+#'
+#' @export
+#'
+#'
+#'
+
+split_unconnected <- function(MC){
   memberships <- MC$membership
   split.memb <- pbapply::pbsapply(unique(memberships),function(m) split_membership(m,MC = MC))
   split.memb <- unlist(split.memb)
@@ -482,7 +542,22 @@ split_unconnected2 <- function(MC){
   return(MC)
 }
 
-supercell_GEv2 <- function (MC, ge, groups, mode = c("average", "sum"), weights = NULL, 
+#' Simplification of spatial transcriptomic dataset
+#'
+#' This function converts (i.e., averages or sums up) gene-expression matrix of spatial transcriptomic data into a gene expression
+#' matrix of metacells
+#'
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' @param ge gene expression matrix (or any coordinate matrix) with genes as rows and cells as cols
+#' @param groups vector of membership (assignment of single-cell to metacells)
+#' @param mode string indicating whether to average or sum up `ge` within metacells
+#' @param weights vector of a cell weight (NULL by default), used for computing average gene expression withing cluster of metaells
+#' @param do.median.norm whether to normalize by median value (FALSE by default)
+#'
+#' @return a matrix of simplified (averaged withing groups) data with ncol equal to number of groups and nrows as in the initial dataset
+#' @export
+
+superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = NULL, 
                          do.median.norm = FALSE) 
 {
   if (ncol(ge) != length(groups)) {
@@ -518,7 +593,6 @@ supercell_GEv2 <- function (MC, ge, groups, mode = c("average", "sum"), weights 
                                              FUN = function(x) {
                                                sum(weights[x])
                                              }))
-    #GE.SC <- sweep(GE.SC, 2, weighted_supercell_size, "/")
     GE.SC <- t(t(GE.SC) / weighted_supercell_size)
   }
   if (do.median.norm) {
@@ -527,19 +601,23 @@ supercell_GEv2 <- function (MC, ge, groups, mode = c("average", "sum"), weights 
   return(GE.SC)
 }
 
-supercell_metaspots_shape <- function(MC, spotpositions,annotation,concavity,membership_name){
-  hull_df_final <- data.frame(x = c(NULL), y = c(NULL), cell_type = c(NULL))
-  for (memb in unique(MC[[membership_name]])){
-    index.tmp <- which(MC[[membership_name]] == memb)
-    polygons.tmp <- concaveman::concaveman(as.matrix(spotpositions[index.tmp,]),concavity = concavity)
-    index.tmp2 <- which(names(MC[[annotation]]) == memb)
-    hull_df.tmp <- data.frame(x = polygons.tmp[, 2], y = polygons.tmp[, 1],
-                              cell_type = rep(MC[[annotation]][index.tmp2],nrow(polygons.tmp)),
-                              membership = rep(memb,nrow(polygons.tmp)))
-    hull_df_final <- rbind(hull_df_final,hull_df.tmp)
-  }
-  return(hull_df_final)
-}
+#' Computation of the geometric values of metaspots
+#'
+#' This function computes the geometric values of metaspots based on the previously computed polygons using pliman R package
+#'
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' @param polygon_col character of the name where the polygons representing the metaspots are stored in the MC object
+#' @param membership_col character of the name where the memberships of the spots are stored in the MC object
+#'
+#' @return a dataframe with columns
+#' \itemize{
+#'   \item memberships - memberships of the metaspots
+#'   \item elongations - elongations of the metaspots
+#'   \item circularities - circularities of the metaspots
+#'   \item convexities - convexities of the metaspots
+#' }
+#' 
+#' @export
 
 shape_metrics <- function(MC,polygon_col,membership_col){
   full.df <- MC[[polygon_col]] 
@@ -577,10 +655,22 @@ shape_metrics <- function(MC,polygon_col,membership_col){
   return(metrics)
 }
 
+#' Superspots to Seurat object
+#'
+#' This function transforms superspot gene expression and superspot partition into \link[Seurat]{Seurat} object
+#'
+#'
+#' @param SC.GE gene expression matrix with genes as rows and cells as columns
+#' @param SC super-cell (output of \link{SCimplify} function)
+#' @param fields which fields of \code{SC} to use as cell metadata
+#'
+#'
+#'
+#' @return \link[Seurat]{Seurat} object
+#'
+#' @export
 
-
-supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c(), var.genes = NULL, is.log.normalized = TRUE, 
-          do.center = TRUE, do.scale = TRUE, N.comp = NULL) 
+supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c()) 
 {
   N.c <- ncol(SC.GE)
   if (is.null(SC$supercell_size)) {
@@ -616,58 +706,6 @@ supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c(), var.genes = NULL, is.
     meta <- cbind(meta, SC.fields)
   }
   m.seurat <- Seurat::CreateSeuratObject(counts = SC.GE, meta.data = meta)
-  #m.seurat <- Seurat::NormalizeData(m.seurat)
-  #print("Done: NormalizeData")
-  #if (is.log.normalized) {
-  #  print("Doing: data to normalized data")
-  #  m.seurat@assays$RNA@layers$data <- m.seurat@assays$RNA@layers$counts
-  #}
-  #if (length(unique(meta$size)) > 1) {
-  #  print("Doing: weighted scaling")
-  #  m.seurat@assays$RNA@layers$scale.data <- t(as.matrix(corpcor::wt.scale(Matrix::t((m.seurat@assays$RNA@layers$data)), 
-  #                                                                  w = meta$size, center = do.center, scale = do.scale)))
-  #  print("Done: weighted scaling")
-  #}
-  #else {
-  #  print("Doing: unweighted scaling")
-  #  m.seurat <- Seurat::ScaleData(m.seurat)
-  #  print("Done: unweighted scaling")
-  #}
-  #m.seurat@assays$RNA@misc[["scale.data.weighted"]] <- m.seurat@assays$RNA@layers$scale.data
-  #if (is.null(var.genes)) {
-  #  var.genes <- sort(SC$genes.use)
-  #}
-  #if (is.null(N.comp)) {
-  #  N.comp <- min(50, ncol(m.seurat@assays$RNA@layers$counts) - 
-  #                  1)
-  #}
-  #Seurat::VariableFeatures(m.seurat) <- var.genes
-  #m.seurat <- Seurat::RunPCA(m.seurat, verbose = F, npcs = max(N.comp),features = var.genes,)
-  #m.seurat@reductions$pca_seurat <- m.seurat@reductions$pca
-  #my_pca <- supercell_prcomp(X = Matrix::t(SC.GE[var.genes, 
-  #]), genes.use = var.genes, fast.pca = TRUE, supercell_size = meta$supercell_size, 
-  #k = dim(m.seurat@reductions$pca_seurat)[2], do.scale = do.scale, 
-  #do.center = do.center)
-  #dimnames(my_pca$x) <- dimnames(m.seurat@reductions$pca_seurat)
-  #m.seurat@reductions$pca@cell.embeddings <- my_pca$x
-  #m.seurat@reductions$pca@feature.loadings <- my_pca$rotation
-  #m.seurat@reductions$pca@stdev <- my_pca$sdev
-  #m.seurat@reductions$pca_weighted <- m.seurat@reductions$pca
-  #m.seurat <- Seurat::FindNeighbors(m.seurat, compute.SNN = TRUE, 
-  #                                  verbose = TRUE)
-  #if (!is.null(SC$graph.supercells)) {
-  #  adj.mtx <- igraph::get.adjacency(SC$graph.supercells, 
-  #                                   attr = "weight")
-  #  m.seurat@graphs$RNA_nn@i <- adj.mtx@i
-  #  m.seurat@graphs$RNA_nn@p <- adj.mtx@p
-  #  m.seurat@graphs$RNA_nn@Dim <- adj.mtx@Dim
-  #  m.seurat@graphs$RNA_nn@x <- adj.mtx@x
-  #  m.seurat@graphs$RNA_nn@factors <- adj.mtx@factors
-  #  m.seurat@graphs$RNA_super_cells <- m.seurat@graphs$RNA_nn
-  #}
-  #else {
-  #  warning("Super-cell graph was not found in SC object, no super-cell graph was added to Seurat object")
-  #}
   return(m.seurat)
 }
 
