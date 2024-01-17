@@ -8,18 +8,14 @@ output: html_document
 ## Import libraries
 ```{r}
 library(Seurat)
-#library(SuperSpot)
+library(SuperSpot)
 library(SuperCell)
 library(tidyr)
 library(tidyverse)
 library(igraph)
 ```
 
-```{r}
-source("/Users/admin/Documents/GitHub/SuperSpot/R/basicSTplot.R")
-source("/Users/admin/Documents/GitHub/SuperSpot/R/SCimplify_SpatialDLS.R")
-```
-
+Download files from https://zenodo.org/records/8327576. You need "well7_5raw_expression_pd.csv", "metadata.csv" and "well7_5_spatial.csv".
 
 ## Import dataset
 ```{r}
