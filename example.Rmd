@@ -87,13 +87,17 @@ print(str_c("mean purity is ",mean(MC.well7_DLS$purity)))
 MC.well7_DLS$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Main_molecular_cell_type,supercell_membership = MC.well7_DLS$membership,method = "absolute")
 ```
 
+SuperSpot come with its own way to visualize the metapots. The function "supercell_metaspots_shape" first builds the polygons representing the metaspots covering the original spots.
 ```{r}
 print("Creating polygons for visualization")
 MC.well7_DLS$polygons <- supercell_metaspots_shape(MC = MC.well7_DLS,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
 print("Done")
 SpatialDimPlotSC(original_coord = spotPosition ,MC = MC.well7_DLS,
                     sc.col = "Main_molecular_cell_type",sc.col2 = str_c("MC_membership_",g),polygons_col = "polygons" ,meta_data = well7.md )+NoLegend()
+```
 
+Because we wanted that every metaspot contains only one cell type and we split them, it created metaspots with gaps. To overcome this, we split them again based on if there are still connected or not in the KNN.
+```{r}
 MC.well7_DLS.spl <- split_unconnected(MC.well7_DLS)
 well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7_DLS.spl$membership %>% as.character()
 
@@ -139,6 +143,7 @@ levels(MC.seurat) <- sort(levels(MC.seurat))
 
 VlnPlot(MC.seurat,"nFeature_RNA")+NoLegend()
 
+#Compute marker genes
 well7.mc.markers <-  FindAllMarkers(MC.seurat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25 ) %>% filter(p_val_adj < 0.05)
 well7.mc.top.markers <- well7.mc.markers %>%
    group_by(cluster) %>%
