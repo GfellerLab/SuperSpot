@@ -17,17 +17,24 @@ library(igraph)
 
 Download files from https://zenodo.org/records/8327576. You need "well7_5raw_expression_pd.csv", "metadata.csv" and "well7_5_spatial.csv".
 
+```{bash}
+wget https://zenodo.org/records/8327576/files/well7_5raw_expression_pd.csv
+wget https://zenodo.org/records/8327576/files/metadata.csv
+wget https://zenodo.org/records/8327576/files/well7_5_spatial.csv
+```
+
+
 ## Import dataset
 ```{r}
-well7.mtx <- read_csv("~/Downloads/well7_5raw_expression_pd.csv")%>% column_to_rownames("GENE")
+well7.mtx <- read_csv("./well7_5raw_expression_pd.csv")%>% column_to_rownames("GENE")
 well7.mtx[1:5,1:5]
 
-md <- read_csv("~/Downloads/metadata.csv")
+md <- read_csv("./metadata.csv")
 md[1:5,1:5]
 well7.md <- md[md$NAME %in% colnames(well7.mtx) == T,]
 well7.md[1:5,1:5]
 
-well7.spatial <- read_csv("~/Downloads/well7_5_spatial.csv")
+well7.spatial <- read_csv("./well7_5_spatial.csv")
 well7.spatial <- well7.spatial[-1,]
 
 spotPosition <- dplyr::select(well7.spatial,c("NAME","X","Y")) %>% column_to_rownames("NAME")
@@ -39,21 +46,33 @@ spotPosition <- select(spotPosition,c("imagerow","imagecol"))
 ```
 
 ## Create metaspot object
+The function "SCimplify_SpatialDLS" uses the raw count matrix and the spatial coordinates of the spots to build the metaspots. You can choose to split or not the the connections between the spots that have a higher distance compared to the other ones with "split_not_connected". You can also split the metaspots based on a provided annotation with "cell.annotation" parameter.
+The main output here is the membership given to each spot to know in which metaspot it is assigned.
 ```{r}
-g = 10
-n.pc = 5
-k.knn = 16
+g = 10 # gamma
+n.pc = 5 
+k.knn = 16 # number of neighbors to connect to each spot
 
 print("Creating metaspots")
-MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,spotPositions = spotPosition ,
-                                     method_similarity = "1",split_not_connected = T,
-                                     genes.use = rownames(well7.mtx),gamma = i,n.pc = 30,
-                                      method_knn = "1",k.knn = 16,method_normalization = "log_normalize",cell.annotation = well7.md$Main_molecular_cell_type)
+MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,
+                                     spotPositions = spotPosition ,
+                                     method_similarity = "1",
+                                     split_not_connected = T,
+                                     genes.use = rownames(well7.mtx),
+                                     gamma = g,n.pc = n.pc,
+                                      method_knn = "1",
+                                     k.knn = k.knn,
+                                     method_normalization = "log_normalize",
+                                     cell.annotation = well7.md$Main_molecular_cell_type)
 
 print("Done")
 
 well7.md[,str_c("MC_membership_",g)] <- MC.well7_DLS$membership %>% as.character()
+```
 
+The major quality control for metaspots is purity (proportion of the most abundant cell type/region within each metaspot). In the case, where we decided to split the metaspots with the paramater "cell.annotation", the purity should be equal to 1.
+```{r}
+#We compute the purity for each metaspot
 method_purity <- c("max_proportion", "entropy")[1]
 MC.well7_DLS$purity <- supercell_purity(
   clusters = well7.md$Main_molecular_cell_type,
@@ -62,10 +81,13 @@ MC.well7_DLS$purity <- supercell_purity(
 )
 
 
-print(str_c("purity is ",MC.well7_DLS$purity))
+print(str_c("mean purity is ",mean(MC.well7_DLS$purity)))
 
+#We assign each metaspot with its corresponding annotation
 MC.well7_DLS$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Main_molecular_cell_type,supercell_membership = MC.well7_DLS$membership,method = "absolute")
+```
 
+```{r}
 print("Creating polygons for visualization")
 MC.well7_DLS$polygons <- supercell_metaspots_shape(MC = MC.well7_DLS,spotpositions = spotPosition ,annotation = "Main_molecular_cell_type",concavity = 2,membership_name = "membership")
 print("Done")
