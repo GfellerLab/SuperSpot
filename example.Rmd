@@ -133,7 +133,7 @@ MC.seurat <- RunPCA(MC.seurat)
 
 MC.seurat <- RunUMAP(MC.seurat, dims = 1:30)
 
-DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")
+DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")+NoLegend()
 ```
 
 ## Perform downstream analyses
