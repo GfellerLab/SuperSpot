@@ -374,34 +374,34 @@ them again based on if they are still connected or not in the KNN.
     ## To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
     ## This message will be shown once per session
 
-    ## 15:53:10 UMAP embedding parameters a = 0.9922 b = 1.112
+    ## 16:30:07 UMAP embedding parameters a = 0.9922 b = 1.112
 
     ## Found more than one class "dist" in cache; using the first, from namespace 'spam'
 
     ## Also defined by 'BiocGenerics'
 
-    ## 15:53:10 Read 20135 rows and found 30 numeric columns
+    ## 16:30:07 Read 20135 rows and found 30 numeric columns
 
-    ## 15:53:10 Using Annoy for neighbor search, n_neighbors = 30
+    ## 16:30:07 Using Annoy for neighbor search, n_neighbors = 30
 
     ## Found more than one class "dist" in cache; using the first, from namespace 'spam'
 
     ## Also defined by 'BiocGenerics'
 
-    ## 15:53:10 Building Annoy index with metric = cosine, n_trees = 50
+    ## 16:30:07 Building Annoy index with metric = cosine, n_trees = 50
 
     ## 0%   10   20   30   40   50   60   70   80   90   100%
 
     ## [----|----|----|----|----|----|----|----|----|----|
 
     ## **************************************************|
-    ## 15:53:11 Writing NN index file to temp file /var/folders/d6/8nyzvqcx6559qg6cqv9tkxc40000gn/T//RtmpRa5z33/filef262584a2737
-    ## 15:53:11 Searching Annoy index using 1 thread, search_k = 3000
-    ## 15:53:15 Annoy recall = 100%
-    ## 15:53:15 Commencing smooth kNN distance calibration using 1 thread with target n_neighbors = 30
-    ## 15:53:16 Initializing from normalized Laplacian + noise (using RSpectra)
-    ## 15:53:16 Commencing optimization for 200 epochs, with 924040 positive edges
-    ## 15:53:23 Optimization finished
+    ## 16:30:08 Writing NN index file to temp file /var/folders/d6/8nyzvqcx6559qg6cqv9tkxc40000gn/T//Rtmpz59SQi/filef407162ca564
+    ## 16:30:08 Searching Annoy index using 1 thread, search_k = 3000
+    ## 16:30:12 Annoy recall = 100%
+    ## 16:30:12 Commencing smooth kNN distance calibration using 1 thread with target n_neighbors = 30
+    ## 16:30:13 Initializing from normalized Laplacian + noise (using RSpectra)
+    ## 16:30:13 Commencing optimization for 200 epochs, with 924040 positive edges
+    ## 16:30:19 Optimization finished
 
     DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")
 

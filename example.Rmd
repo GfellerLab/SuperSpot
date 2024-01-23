@@ -91,7 +91,7 @@ MC.well7_DLS$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Ma
 ```
 
 SuperSpot come with its own way to visualize the metapots. The function "supercell_metaspots_shape" first builds the polygons representing the metaspots covering the original spots.
-```{r}
+```{r,fig.height=20, fig.width=20}
 print("Creating polygons for visualization")
 MC.well7_DLS$polygons <- supercell_metaspots_shape(MC = MC.well7_DLS,
                                                    spotpositions = spotPosition,
@@ -109,7 +109,7 @@ SpatialDimPlotSC(original_coord = spotPosition,
 ```
 
 Because we wanted that every metaspot contains only one cell type and we split them, it created metaspots with gaps. To overcome this, we split them again based on if they are still connected or not in the KNN.
-```{r}
+```{r,fig.height=20, fig.width=20}
 MC.well7_DLS.spl <- split_unconnected(MC.well7_DLS)
 well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7_DLS.spl$membership %>%
   as.character()
