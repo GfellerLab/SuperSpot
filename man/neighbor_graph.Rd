@@ -16,7 +16,8 @@ neighbor_graph(
   method_normalization,
   split_not_connected,
   split_annotation,
-  split_vector
+  split_vector,
+  n.cpu
 )
 }
 \arguments{
@@ -54,6 +55,8 @@ neighbor_graph(
 \item{split_annotation}{split or not the spots in the KNN graph based on their annotation}
 
 \item{split_vector}{vector of the spots annotations on which the KNN will be split}
+
+\item{n.cpu}{number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.}
 
 \item{spotpositions}{a data.frame of the coordinates of the spots}
 }

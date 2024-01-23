@@ -24,6 +24,7 @@ SCimplify_SpatialDLS(
   k.knn = 6,
   do.scale = TRUE,
   n.pc = 5,
+  n.cpu = NULL,
   fast.pca = TRUE,
   do.approx = FALSE,
   approx.N = 20000,
@@ -85,6 +86,8 @@ SCimplify_SpatialDLS(
 \item{do.scale}{whether to scale gene expression matrix when computing PCA}
 
 \item{n.pc}{number of principal components to use for construction of single-cell kNN network}
+
+\item{n.cpu}{number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.}
 
 \item{fast.pca}{use \link[irlba]{irlba} as a faster version of prcomp (one used in Seurat package)}
 

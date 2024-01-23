@@ -7,6 +7,7 @@
 #' @param k.spots number of neighborhoods to take into account when choosing the second method to build the KNN
 #' @param countMatrix raw matrix of the gene expression for each spot
 #' @param n.pc number of principal components to use from PCA
+#' @param n.cpu number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.
 #' @param method_similarity method to compute transcriptional similarity from distance
 #' \itemize{
 #'   \item "1" - similarity = 1 - (distance/max(distance))
@@ -28,7 +29,7 @@
 #' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
 #' @param split_annotation split or not the spots in the KNN graph based on their annotation
 #' @param split_vector vector of the spots annotations on which the KNN will be split
-#' 
+#'
 #' @return a list with components
 #' \itemize{
 #'   \item graph - an igraph graph
@@ -41,7 +42,7 @@
 #'
 
 neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_similarity, method_knn, k.knn, sigs,
-                           method_normalization,split_not_connected,split_annotation,split_vector){
+                           method_normalization,split_not_connected,split_annotation,split_vector,n.cpu){
   if (method_knn == "1"){
     print(paste0("Building KNN graph with nn2"))
     nn2.res <- RANN::nn2(data = spotPositions,k = k.knn+1)
@@ -53,7 +54,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
              geom_violin(aes(x = distribution, y = distances))+
              geom_boxplot(aes(x = distribution, y = distances),width = 0.1)+
              geom_hline(yintercept=min_dist, linetype="dashed", color = "red"))
-      
+
       bad_neighbors_rows <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,1]
       bad_neighbors_cols <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,2]
       new_neighbors <- nn2.res$nn.idx
@@ -61,19 +62,19 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
         new_neighbors[bad_neighbors_rows[ind],bad_neighbors_cols[ind]] <- new_neighbors[bad_neighbors_rows[ind],1]
       }
       spot.graph <- bluster::neighborsToKNNGraph(new_neighbors[,2:k.knn+1],directed = F)
-      
+
     }
     else if (split_not_connected == FALSE){
       spot.graph <- bluster::neighborsToKNNGraph(nn2.res$nn.idx[,2:k.knn+1])
     }
-    
+
     if (!is.null(split_annotation)){
       cell_type.id <- which(split_vector == split_annotation)
       spot.graph <- subgraph(spot.graph,cell_type.id)
       spotPositions <- spotPositions[cell_type.id,]
       countMatrix <- countMatrix[,cell_type.id]
     }
-    
+
     max_gamma <- (nrow(spotPositions)/igraph::components(spot.graph)$no)
     print(paste0("Maximum gamma is ",max_gamma))
     print(paste0("Done"))
@@ -83,14 +84,14 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
   else if (method_knn == "2"){
     print(paste0("Building KNN graph by DLS"))
     print(paste0("Computing distances between spots"))
-    distCoord <- parallelDist::parDist(spotPositions %>% as.matrix())
+    distCoord <- parallelDist::parDist(spotPositions %>% as.matrix(),threads = n.cpu)
     min.dist <- min(distCoord)
     distCoord[distCoord > k.spots*round(min.dist)] <- 0
     distCoord[distCoord >0] <- 1
     spot.graph <- graph.adjacency(distCoord %>% as.matrix(),mode = "undirected")
     print(paste0("Done"))
   }
-  
+
   so <- CreateSeuratObject(countMatrix,assay = "RNA")
   if (method_normalization == "log_normalize"){
     print(paste0("Performing Log Normalization"))
@@ -115,12 +116,12 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     so <- RunPCA(so, assay = "SCT",verbose = F)
     pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
   }
-  
+
   print(paste0("Done"))
   print(paste0("Computing PCA dist for each edge"))
   pca_dist <- pbapply::pbapply(igraph::get.edgelist(spot.graph),
                     1 ,
-                    function(x){parallelDist::parDist(pca_matrix[x,])})
+                    function(x){parallelDist::parDist(pca_matrix[x,],threads = n.cpu)})
   print(paste0("Done"))
   print(paste0("Computing similarity from PCA distances"))
   if (method_similarity == "1"){
@@ -133,7 +134,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     pca_similarity[pca_similarity == 0 ]<- 1e-100
     print(paste0("Done"))
   }
-  
+
   else if (method_similarity == "3"){
     pca_similarity <- proxy::pr_dist2simil(pca_dist)
     pca_similarity[pca_similarity == 0 ]<- 1e-100
@@ -184,6 +185,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #' @param k.knn parameter to compute single-cell kNN network
 #' @param do.scale whether to scale gene expression matrix when computing PCA
 #' @param n.pc number of principal components to use for construction of single-cell kNN network
+#' @param n.cpu number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.
 #' @param fast.pca use \link[irlba]{irlba} as a faster version of prcomp (one used in Seurat package)
 #' @param do.approx compute approximate kNN in case of a large dataset (>50'000)
 #' @param approx.N number of cells to subsample for an approximate approach
@@ -218,7 +220,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #'   \item SC.cell.split.condition. - super-cell split condition (if was provided for single cells)
 #'
 #' }
-#' 
+#'
 #' @export
 #'
 #'
@@ -244,6 +246,7 @@ SCimplify_SpatialDLS <- function(X,
                                 k.knn = 6,
                                 do.scale = TRUE,
                                 n.pc = 5,
+                                n.cpu = NULL,
                                 fast.pca = TRUE,
                                 do.approx = FALSE,
                                 approx.N = 20000,
@@ -254,173 +257,173 @@ SCimplify_SpatialDLS <- function(X,
                                 return.hierarchical.structure = TRUE,
                                 return.seurat.object = FALSE,
                                 ...){
-  
+
   neighbor_graph.output <- neighbor_graph(spotPositions = spotPositions, k.spots = k.spots,split_not_connected = split_not_connected,
                                           countMatrix = X, n.pc = n.pc, method_similarity = method_similarity,
                                           method_knn = method_knn, k.knn = k.knn, sigs = sigs,method_normalization = method_normalization,
-                                          split_annotation = split_annotation,split_vector =split_vector)
-  
+                                          split_annotation = split_annotation,split_vector =split_vector, n.cpu = n.cpu)
+
   X <- GetAssayData(neighbor_graph.output$seurat.object)
-  
+
   N.c <- ncol(X)
-  
-  presampled.cell.ids <- colnames(X) 
-  
- 
-  
+
+  presampled.cell.ids <- colnames(X)
+
+
+
   sc.nw <- neighbor_graph.output$graph
-  
+
   #simplify
-  
+
   k   <- round(N.c/gamma)
   print(paste0("Clustering"))
   if(igraph.clustering[1] == "walktrap"){
     g.s              <- igraph::cluster_walktrap(sc.nw,weights = igraph::E(sc.nw)$weight)
     g.s$membership   <- igraph::cut_at(g.s, k)
-    
+
   } else if(igraph.clustering[1] == "louvain") {
     warning(paste("igraph.clustering =", igraph.clustering, ", gamma is ignored"))
     g.s    <- igraph::cluster_louvain(sc.nw)
-    
+
   } else {
     stop(paste("Unknown clustering method (", igraph.clustering, "), please use louvain or walkrtap"))
   }
   print(paste0("Done"))
   membership.presampled        <- g.s$membership
   names(membership.presampled) <- presampled.cell.ids
-  
-  
+
+
   ## Split super-cells containing cells from different annotations or conditions
   if(!is.null(cell.annotation) | !is.null(cell.split.condition)){
     if(is.null(cell.annotation)) cell.annotation <- rep("a", N.c)
     if(is.null(cell.split.condition)) cell.split.condition <- rep("s", N.c)
     names(cell.annotation) <- names(cell.split.condition) <- colnames(X)
-    
+
     split.cells <- interaction(cell.annotation[presampled.cell.ids], cell.split.condition[presampled.cell.ids], drop = TRUE)
-    
+
     membership.presampled.intr <- interaction(membership.presampled, split.cells, drop = TRUE)
     membership.presampled <- as.numeric(membership.presampled.intr)
-    
+
     map.membership <- unique(membership.presampled)
     names(map.membership) <- unique(as.vector(membership.presampled.intr))
-    
+
     names(membership.presampled) <- presampled.cell.ids
   }
-  
-  
-  
+
+
+
   SC.NW                        <- igraph::contract(sc.nw, membership.presampled)
   if(!do.approx){
     SC.NW                        <- igraph::simplify(SC.NW, remove.loops = T, edge.attr.comb="sum")
   }
-  
-  
+
+
   if(do.approx){
-    
+
     PCA.averaged.SC      <- as.matrix(Matrix::t(supercell_GE(t(PCA.presampled$x[,n.pc]), groups = membership.presampled)))
     X.for.roration       <- Matrix::t(X[genes.use, rest.cell.ids])
-    
-    
-    
+
+
+
     if(do.scale){ X.for.roration <- scale(X.for.roration) }
     X.for.roration[is.na(X.for.roration)] <- 0
-    
-    
+
+
     membership.omitted   <- c()
     if(is.null(block.size) | is.na(block.size)) block.size <- 10000
-    
+
     N.blocks <- length(rest.cell.ids)%/%block.size
     if(length(rest.cell.ids)%%block.size > 0) N.blocks <- N.blocks+1
-    
-    
+
+
     if(N.blocks>0){
       for(i in 1:N.blocks){ # compute knn by blocks
         idx.begin <- (i-1)*block.size + 1
         idx.end   <- min(i*block.size,  length(rest.cell.ids))
-        
+
         cur.rest.cell.ids    <- rest.cell.ids[idx.begin:idx.end]
-        
+
         PCA.ommited          <- X.for.roration[cur.rest.cell.ids,] %*% PCA.presampled$rotation[, n.pc] ###
-        
+
         D.omitted.subsampled <- proxy::dist(PCA.ommited, PCA.averaged.SC) ###
-        
+
         membership.omitted.cur        <- apply(D.omitted.subsampled, 1, which.min) ###
         names(membership.omitted.cur) <- cur.rest.cell.ids ###
-        
+
         membership.omitted   <- c(membership.omitted, membership.omitted.cur)
       }
     }
-    
+
     membership.all       <- c(membership.presampled, membership.omitted)
     #membership.all       <- membership.all[colnames(X)]
-    
-    
+
+
     names_membership.all <- names(membership.all)
     ## again split super-cells containing cells from different annotation or split conditions
     if(!is.null(cell.annotation) | !is.null(cell.split.condition)){
-      
+
       split.cells <- interaction(cell.annotation[names_membership.all],
                                  cell.split.condition[names_membership.all], drop = TRUE)
-      
-      
+
+
       membership.all.intr <- interaction(membership.all, split.cells, drop = TRUE)
-      
+
       membership.all.intr.v <- as.vector(membership.all.intr)
       membership.all.intr.v.u <- unique(membership.all.intr.v)
-      
+
       ## add new nodes to SC.NW
       adj <- igraph::get.adjlist(SC.NW, mode = "all")
-      
+
       add.node.id <- igraph::vcount(SC.NW) + 1
       membership.all.const <- membership.all
-      
+
       for(i in sort(unique(membership.all.const))){
-        
+
         cur.sc <- which(membership.all == i)
         cur.main.node <- membership.all.intr.v[cur.sc[1]]
         n.add.nodes <- length(unique(membership.all.intr.v[cur.sc])) - 1
-        
+
         additional.nodes <- setdiff(unique(membership.all.intr.v[cur.sc]), cur.main.node)
-        
+
         a.n <- 1
         if(n.add.nodes > 0){
           f.node.id <- add.node.id
           l.node.id <- add.node.id + n.add.nodes -1
-          
+
           for(j in f.node.id:l.node.id){
-            
-            
+
+
             membership.all[membership.all.intr.v == additional.nodes[a.n]] <- j
             a.n <- a.n+1
             adj[[j]] <- c(as.numeric(adj[[i]]), i, f.node.id:l.node.id) # split super-cell node by adding additional node and connecting it to the same neighbours
             add.node.id <- add.node.id + 1
           }
-          
+
           adj[[i]] <- c(as.numeric(adj[[i]]), f.node.id:l.node.id)
         }
       }
-      
-      
+
+
       SC.NW                        <- igraph::graph_from_adj_list(adj, duplicate = F)
       SC.NW                        <- igraph::as.undirected(SC.NW)
-      
-      
+
+
     }
     SC.NW                        <- igraph::simplify(SC.NW, remove.loops = T, edge.attr.comb="sum")
     names(membership.all) <- names_membership.all
     membership.all <- membership.all[colnames(X)]
-    
+
   } else {
     membership.all       <- membership.presampled[colnames(X)]
   }
   membership       <- membership.all
-  
+
   supercell_size   <- as.vector(table(membership))
-  
+
   igraph::E(SC.NW)$width         <- sqrt(igraph::E(SC.NW)$weight/10)
   igraph::V(SC.NW)$size          <- supercell_size
   igraph::V(SC.NW)$sizesqrt      <- sqrt(igraph::V(SC.NW)$size)
-  
+
   res <- list(graph.supercells = SC.NW,
               gamma = gamma,
               N.SC = length(unique(membership)),
@@ -438,19 +441,19 @@ SCimplify_SpatialDLS <- function(X,
               sc.cell.annotation. = cell.annotation,
               sc.cell.split.condition. = cell.split.condition
   )
-  
+
   if(return.singlecell.NW){res$graph.singlecell <- sc.nw}
   if(!is.null(cell.annotation) | !is.null(cell.split.condition)){
     res$SC.cell.annotation. <- supercell_assign(cell.annotation, res$membership)
     res$SC.cell.split.condition. <- supercell_assign(cell.split.condition, res$membership)
   }
-  
-  
+
+
   if(igraph.clustering[1] == "walktrap" & return.hierarchical.structure){ res$h_membership <- g.s}
   gc()
-  
+
   if(return.seurat.object == TRUE){seurat.object = neighbor_graph.output$seurat.object}
-  
+
   return(res)
 }
 
@@ -461,7 +464,7 @@ SCimplify_SpatialDLS <- function(X,
 #'
 #' @param spotpositions a data.frame of the coordinates of the spots
 #' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
-#' 
+#'
 #' @return a dataframe of the centroids coordinates for each metaspot
 #'
 #' @export
@@ -473,7 +476,7 @@ SCimplify_SpatialDLS <- function(X,
 supercell_spatial_centroids <- function(MC,spotPositions){
   membership <-MC$membership
   seuratCoordMetacell <-  cbind(spotPositions,membership)
-  
+
   centroids <- stats::aggregate(spotPositions %>% as.matrix() ~membership,spotPositions,mean) #should be taken from object slot
   centroids[["supercell_size"]] <- MC[["supercell_size"]]
   return(centroids)
@@ -486,7 +489,7 @@ supercell_spatial_centroids <- function(MC,spotPositions){
 #'
 #' @param m given membership
 #' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
-#' 
+#'
 #' @return a vector of membership with updated split memberships
 #'
 #' @export
@@ -506,7 +509,7 @@ split_membership <- function(m,MC){
     new_memberships <- paste(old_memberships, new_memberships, sep = "_") #%>% as.numeric()
     memberships[vertex.id] <- new_memberships
     #print(memberships[vertex.id])
-    
+
   }
   return(memberships[vertex.id])
 }
@@ -517,7 +520,7 @@ split_membership <- function(m,MC){
 #'
 #'
 #' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
-#' 
+#'
 #' @return a vector of membership with updated split memberships
 #'
 #' @export
@@ -557,8 +560,8 @@ split_unconnected <- function(MC){
 #' @return a matrix of simplified (averaged withing groups) data with ncol equal to number of groups and nrows as in the initial dataset
 #' @export
 
-superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = NULL, 
-                         do.median.norm = FALSE) 
+superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = NULL,
+                         do.median.norm = FALSE)
 {
   if (ncol(ge) != length(groups)) {
     stop("Length of the vector groups has to be equal to the number of cols in matrix ge")
@@ -584,12 +587,12 @@ superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = 
       stop("weights must be the same length as groups or NULL in case of unweighted averaging")
     }
     if (mode != "average") {
-      stop(paste("weighted averaging is supposted only for mode = 'average', not for", 
+      stop(paste("weighted averaging is supposted only for mode = 'average', not for",
                  mode))
     }
     M.AV <- Matrix::sparseMatrix(i = i, j = j, x = weights[i])
     GE.SC <- ge %*% M.AV
-    weighted_supercell_size <- unlist(lapply(goups.idx, 
+    weighted_supercell_size <- unlist(lapply(goups.idx,
                                              FUN = function(x) {
                                                sum(weights[x])
                                              }))
@@ -616,11 +619,11 @@ superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = 
 #'   \item circularities - circularities of the metaspots
 #'   \item convexities - convexities of the metaspots
 #' }
-#' 
+#'
 #' @export
 
 shape_metrics <- function(MC,polygon_col,membership_col){
-  full.df <- MC[[polygon_col]] 
+  full.df <- MC[[polygon_col]]
   names(table(MC[[membership_col]]))[table(MC[[membership_col]]) > 2] -> big.memb
   #print(dupli.memb)
   #full.df[full.df$membership %in% big.memb,] -> full.df_final
@@ -649,7 +652,7 @@ shape_metrics <- function(MC,polygon_col,membership_col){
       circularities <- c(circularities,0)
       convexities <- c(convexities,0)
     }
-    
+
   }
   metrics <- tibble(memberships = memberships, elongations = elongations, circularities = circularities, convexities = convexities)
   return(metrics)
@@ -670,7 +673,7 @@ shape_metrics <- function(MC,polygon_col,membership_col){
 #'
 #' @export
 
-supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c()) 
+supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c())
 {
   N.c <- ncol(SC.GE)
   if (is.null(SC$supercell_size)) {
@@ -681,7 +684,7 @@ supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c())
     supercell_size <- SC$supercell_size
   }
   if (length(supercell_size) != N.c) {
-    stop(paste0("length of SC$supercell_size has to be the same as number of super-cells ", 
+    stop(paste0("length of SC$supercell_size has to be the same as number of super-cells ",
                 N.c))
   }
   if (is.null(colnames(SC.GE))) {
@@ -700,7 +703,7 @@ supercell_2_Seuratv5 <- function (SC.GE, SC, fields = c())
   }
   SC.field.length <- lapply(SC.fields, length)
   SC.fields <- SC.fields[which(SC.field.length == N.c)]
-  meta <- data.frame(size = supercell_size, row.names = colnames(SC.GE), 
+  meta <- data.frame(size = supercell_size, row.names = colnames(SC.GE),
                      stringsAsFactors = FALSE)
   if (length(SC.fields) > 0) {
     meta <- cbind(meta, SC.fields)
