@@ -11,24 +11,17 @@ SCimplify_SpatialDLS(
   method_similarity = "3",
   method_knn = "1",
   method_normalization = "log_normalize",
-  split_not_connected,
+  split_not_connected = TRUE,
   split_annotation = NULL,
   split_vector,
   sigs = 1000,
-  genes.use = NULL,
-  genes.exclude = NULL,
   cell.annotation = NULL,
   cell.split.condition = NULL,
-  n.var.genes = min(1000, nrow(X)),
   gamma = 10,
   k.knn = 6,
   do.scale = TRUE,
   n.pc = 5,
   n.cpu = NULL,
-  fast.pca = TRUE,
-  do.approx = FALSE,
-  approx.N = 20000,
-  block.size = 10000,
   seed = 12345,
   igraph.clustering = c("walktrap", "louvain"),
   return.singlecell.NW = TRUE,
@@ -69,39 +62,23 @@ SCimplify_SpatialDLS(
 
 \item{sigs}{parameter when computing the transcriptional similarity with method "2"}
 
-\item{genes.use}{a vector of genes used to compute PCA}
-
-\item{genes.exclude}{a vector of genes to be excluded when computing PCA}
-
 \item{cell.annotation}{a vector of cell type annotation, if provided, metacells that contain single cells of different cell type annotation will be split in multiple pure metacell (may result in slightly larger numbe of metacells than expected with a given gamma)}
 
 \item{cell.split.condition}{a vector of cell conditions that must not be mixed in one metacell. If provided, metacells will be split in condition-pure metacell (may result in significantly(!) larger number of metacells than expected)}
-
-\item{n.var.genes}{if \code{"genes.use"} is not provided, \code{"n.var.genes"} genes with the largest variation are used}
 
 \item{gamma}{graining level of data (proportion of number of single cells in the initial dataset to the number of metacells in the final dataset)}
 
 \item{k.knn}{parameter to compute single-cell kNN network}
 
-\item{do.scale}{whether to scale gene expression matrix when computing PCA}
-
 \item{n.pc}{number of principal components to use for construction of single-cell kNN network}
 
 \item{n.cpu}{number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.}
-
-\item{fast.pca}{use \link[irlba]{irlba} as a faster version of prcomp (one used in Seurat package)}
-
-\item{do.approx}{compute approximate kNN in case of a large dataset (>50'000)}
-
-\item{approx.N}{number of cells to subsample for an approximate approach}
-
-\item{block.size}{number of cells to map to the nearest metacell at the time (for approx coarse-graining)}
 
 \item{seed}{seed to use to subsample cells for an approximate approach}
 
 \item{igraph.clustering}{clustering method to identify metacells (available methods "walktrap" (default) and "louvain" (not recommended, gamma is ignored)).}
 
-\item{return.singlecell.NW}{whether return single-cell network (which consists of approx.N if \code{"do.approx"} or all cells otherwise)}
+\item{return.singlecell.NW}{whether return single-cell network}
 
 \item{return.hierarchical.structure}{whether return hierarchical structure of metacell}
 
@@ -120,8 +97,6 @@ a list with components
 \item supercell_size - size of metacells (former super-cells)
 \item gamma - requested graining level
 \item N.SC - number of obtained metacells
-\item genes.use - used genes
-\item do.approx - whether approximate coarse-graining was perfirmed
 \item n.pc - number of principal components used for metacells construction
 \item k.knn - number of neighbors to build single-cell graph
 \item k.spots - number of neighborhood used if method_knn was "2"

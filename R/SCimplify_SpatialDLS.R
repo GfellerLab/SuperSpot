@@ -42,12 +42,13 @@
 #'
 
 neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_similarity, method_knn, k.knn, sigs,
-                           method_normalization,split_not_connected,split_annotation,split_vector,n.cpu){
+                           method_normalization,split_not_connected,split_annotation,split_vector,n.cpu, plot.graph, pct){
   if (method_knn == "1"){
     print(paste0("Building KNN graph with nn2"))
     nn2.res <- RANN::nn2(data = spotPositions,k = k.knn+1)
     if (split_not_connected == TRUE){
-      min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F)[3]
+      #min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F)[3]
+      min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F,probs = pct)
       print(paste0("Neighbors with distance > ",min_dist, " are removed"))
       plot(ggplot(data = tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
                                 distribution = rep(".",length(as.vector(nn2.res$nn.dists[,2:k.knn+1])))))+
@@ -55,8 +56,10 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
              geom_boxplot(aes(x = distribution, y = distances),width = 0.1)+
              geom_hline(yintercept=min_dist, linetype="dashed", color = "red"))
 
-      bad_neighbors_rows <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,1]
-      bad_neighbors_cols <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,2]
+      #bad_neighbors_rows <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,1]
+      #bad_neighbors_cols <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,2]
+      bad_neighbors_rows <- which(nn2.res$nn.dists > min_dist,arr.ind = T)[,1]
+      bad_neighbors_cols <- which(nn2.res$nn.dists > min_dist,arr.ind = T)[,2]
       new_neighbors <- nn2.res$nn.idx
       for (ind in 1:length(bad_neighbors_rows)){
         new_neighbors[bad_neighbors_rows[ind],bad_neighbors_cols[ind]] <- new_neighbors[bad_neighbors_rows[ind],1]
@@ -91,6 +94,16 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     spot.graph <- graph.adjacency(distCoord %>% as.matrix(),mode = "undirected")
     print(paste0("Done"))
   }
+
+  if (plot.graph == TRUE){
+    plot(spot.graph,
+         layout = matrix(c(V(spot.graph)$x, V(spot.graph)$y), ncol = 2),
+         vertex.label.cex = 0.1,
+         vertex.size = 1,
+         edge.arrow.size = 0.7,
+         main = "Graph with Custom X and Y Coordinates")
+  }
+
 
   so <- CreateSeuratObject(countMatrix,assay = "RNA")
   if (method_normalization == "log_normalize"){
@@ -176,23 +189,17 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
 #' @param split_annotation split or not the spots in the KNN graph based on their annotation
 #' @param split_vector vector of the spots annotations on which the KNN will be split
-#' @param genes.use a vector of genes used to compute PCA
-#' @param genes.exclude a vector of genes to be excluded when computing PCA
 #' @param cell.annotation a vector of cell type annotation, if provided, metacells that contain single cells of different cell type annotation will be split in multiple pure metacell (may result in slightly larger numbe of metacells than expected with a given gamma)
 #' @param cell.split.condition a vector of cell conditions that must not be mixed in one metacell. If provided, metacells will be split in condition-pure metacell (may result in significantly(!) larger number of metacells than expected)
-#' @param n.var.genes if \code{"genes.use"} is not provided, \code{"n.var.genes"} genes with the largest variation are used
 #' @param gamma graining level of data (proportion of number of single cells in the initial dataset to the number of metacells in the final dataset)
 #' @param k.knn parameter to compute single-cell kNN network
-#' @param do.scale whether to scale gene expression matrix when computing PCA
 #' @param n.pc number of principal components to use for construction of single-cell kNN network
 #' @param n.cpu number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.
-#' @param fast.pca use \link[irlba]{irlba} as a faster version of prcomp (one used in Seurat package)
-#' @param do.approx compute approximate kNN in case of a large dataset (>50'000)
-#' @param approx.N number of cells to subsample for an approximate approach
-#' @param block.size number of cells to map to the nearest metacell at the time (for approx coarse-graining)
+#' @param plot.graph boolean of whether or not plotting the KNN graph
+#' @param pct percentage of the connections to keep
 #' @param seed seed to use to subsample cells for an approximate approach
 #' @param igraph.clustering clustering method to identify metacells (available methods "walktrap" (default) and "louvain" (not recommended, gamma is ignored)).
-#' @param return.singlecell.NW whether return single-cell network (which consists of approx.N if \code{"do.approx"} or all cells otherwise)
+#' @param return.singlecell.NW whether return single-cell network
 #' @param return.hierarchical.structure whether return hierarchical structure of metacell
 #' @param return.seurat.object whether return seurat object of spots used to computed PCA
 #' @param ... other parameters of \link{build_knn_graph} function
@@ -205,8 +212,6 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #'   \item supercell_size - size of metacells (former super-cells)
 #'   \item gamma - requested graining level
 #'   \item N.SC - number of obtained metacells
-#'   \item genes.use - used genes
-#'   \item do.approx - whether approximate coarse-graining was perfirmed
 #'   \item n.pc - number of principal components used for metacells construction
 #'   \item k.knn - number of neighbors to build single-cell graph
 #'   \item k.spots - number of neighborhood used if method_knn was "2"
@@ -233,24 +238,19 @@ SCimplify_SpatialDLS <- function(X,
                                 method_similarity = "3",
                                 method_knn = "1",
                                 method_normalization = "log_normalize",
-                                split_not_connected,
+                                split_not_connected = TRUE,
                                 split_annotation = NULL,
                                 split_vector,
                                 sigs = 1000,
-                                genes.use = NULL,
-                                genes.exclude = NULL,
                                 cell.annotation = NULL,
                                 cell.split.condition = NULL,
-                                n.var.genes = min(1000, nrow(X)),
                                 gamma = 10,
                                 k.knn = 6,
                                 do.scale = TRUE,
                                 n.pc = 5,
                                 n.cpu = NULL,
-                                fast.pca = TRUE,
-                                do.approx = FALSE,
-                                approx.N = 20000,
-                                block.size = 10000,
+                                plot.graph = FALSE,
+                                pct = 0.6,
                                 seed = 12345,
                                 igraph.clustering = c("walktrap", "louvain"),
                                 return.singlecell.NW = TRUE,
@@ -261,7 +261,8 @@ SCimplify_SpatialDLS <- function(X,
   neighbor_graph.output <- neighbor_graph(spotPositions = spotPositions, k.spots = k.spots,split_not_connected = split_not_connected,
                                           countMatrix = X, n.pc = n.pc, method_similarity = method_similarity,
                                           method_knn = method_knn, k.knn = k.knn, sigs = sigs,method_normalization = method_normalization,
-                                          split_annotation = split_annotation,split_vector =split_vector, n.cpu = n.cpu)
+                                          split_annotation = split_annotation,split_vector =split_vector, n.cpu = n.cpu,plot.graph = plot.graph,
+                                          pct = pct)
 
   X <- GetAssayData(neighbor_graph.output$seurat.object)
 
@@ -313,109 +314,12 @@ SCimplify_SpatialDLS <- function(X,
 
 
   SC.NW                        <- igraph::contract(sc.nw, membership.presampled)
-  if(!do.approx){
-    SC.NW                        <- igraph::simplify(SC.NW, remove.loops = T, edge.attr.comb="sum")
-  }
-
-
-  if(do.approx){
-
-    PCA.averaged.SC      <- as.matrix(Matrix::t(supercell_GE(t(PCA.presampled$x[,n.pc]), groups = membership.presampled)))
-    X.for.roration       <- Matrix::t(X[genes.use, rest.cell.ids])
+  SC.NW                        <- igraph::simplify(SC.NW, remove.loops = T, edge.attr.comb="sum")
 
 
 
-    if(do.scale){ X.for.roration <- scale(X.for.roration) }
-    X.for.roration[is.na(X.for.roration)] <- 0
+  membership.all       <- membership.presampled[colnames(X)]
 
-
-    membership.omitted   <- c()
-    if(is.null(block.size) | is.na(block.size)) block.size <- 10000
-
-    N.blocks <- length(rest.cell.ids)%/%block.size
-    if(length(rest.cell.ids)%%block.size > 0) N.blocks <- N.blocks+1
-
-
-    if(N.blocks>0){
-      for(i in 1:N.blocks){ # compute knn by blocks
-        idx.begin <- (i-1)*block.size + 1
-        idx.end   <- min(i*block.size,  length(rest.cell.ids))
-
-        cur.rest.cell.ids    <- rest.cell.ids[idx.begin:idx.end]
-
-        PCA.ommited          <- X.for.roration[cur.rest.cell.ids,] %*% PCA.presampled$rotation[, n.pc] ###
-
-        D.omitted.subsampled <- proxy::dist(PCA.ommited, PCA.averaged.SC) ###
-
-        membership.omitted.cur        <- apply(D.omitted.subsampled, 1, which.min) ###
-        names(membership.omitted.cur) <- cur.rest.cell.ids ###
-
-        membership.omitted   <- c(membership.omitted, membership.omitted.cur)
-      }
-    }
-
-    membership.all       <- c(membership.presampled, membership.omitted)
-    #membership.all       <- membership.all[colnames(X)]
-
-
-    names_membership.all <- names(membership.all)
-    ## again split super-cells containing cells from different annotation or split conditions
-    if(!is.null(cell.annotation) | !is.null(cell.split.condition)){
-
-      split.cells <- interaction(cell.annotation[names_membership.all],
-                                 cell.split.condition[names_membership.all], drop = TRUE)
-
-
-      membership.all.intr <- interaction(membership.all, split.cells, drop = TRUE)
-
-      membership.all.intr.v <- as.vector(membership.all.intr)
-      membership.all.intr.v.u <- unique(membership.all.intr.v)
-
-      ## add new nodes to SC.NW
-      adj <- igraph::get.adjlist(SC.NW, mode = "all")
-
-      add.node.id <- igraph::vcount(SC.NW) + 1
-      membership.all.const <- membership.all
-
-      for(i in sort(unique(membership.all.const))){
-
-        cur.sc <- which(membership.all == i)
-        cur.main.node <- membership.all.intr.v[cur.sc[1]]
-        n.add.nodes <- length(unique(membership.all.intr.v[cur.sc])) - 1
-
-        additional.nodes <- setdiff(unique(membership.all.intr.v[cur.sc]), cur.main.node)
-
-        a.n <- 1
-        if(n.add.nodes > 0){
-          f.node.id <- add.node.id
-          l.node.id <- add.node.id + n.add.nodes -1
-
-          for(j in f.node.id:l.node.id){
-
-
-            membership.all[membership.all.intr.v == additional.nodes[a.n]] <- j
-            a.n <- a.n+1
-            adj[[j]] <- c(as.numeric(adj[[i]]), i, f.node.id:l.node.id) # split super-cell node by adding additional node and connecting it to the same neighbours
-            add.node.id <- add.node.id + 1
-          }
-
-          adj[[i]] <- c(as.numeric(adj[[i]]), f.node.id:l.node.id)
-        }
-      }
-
-
-      SC.NW                        <- igraph::graph_from_adj_list(adj, duplicate = F)
-      SC.NW                        <- igraph::as.undirected(SC.NW)
-
-
-    }
-    SC.NW                        <- igraph::simplify(SC.NW, remove.loops = T, edge.attr.comb="sum")
-    names(membership.all) <- names_membership.all
-    membership.all <- membership.all[colnames(X)]
-
-  } else {
-    membership.all       <- membership.presampled[colnames(X)]
-  }
   membership       <- membership.all
 
   supercell_size   <- as.vector(table(membership))
@@ -429,9 +333,7 @@ SCimplify_SpatialDLS <- function(X,
               N.SC = length(unique(membership)),
               membership = membership,
               supercell_size = supercell_size,
-              genes.use = genes.use,
               simplification.algo = igraph.clustering[1],
-              do.approx = do.approx,
               n.pc = n.pc,
               k.spots = k.spots,
               sigs = sigs,
@@ -452,7 +354,7 @@ SCimplify_SpatialDLS <- function(X,
   if(igraph.clustering[1] == "walktrap" & return.hierarchical.structure){ res$h_membership <- g.s}
   gc()
 
-  if(return.seurat.object == TRUE){seurat.object = neighbor_graph.output$seurat.object}
+  if(return.seurat.object == TRUE){res$seurat.object = neighbor_graph.output$seurat.object}
 
   return(res)
 }
@@ -542,6 +444,7 @@ split_unconnected <- function(MC){
   #MC$supercell_size <- table(MC$membership) %>% unname()
   MC$supercell_size <- as.vector(table(MC$membership))
   MC$N.SC <- length(MC$supercell_size)
+  MC$effect.gamma <- length(MC$membership)/MC$N.SC
   return(MC)
 }
 

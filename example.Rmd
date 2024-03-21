@@ -64,7 +64,7 @@ MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,
                                      method_knn = "1",
                                      k.knn = k.knn,
                                      method_normalization = "log_normalize",
-                                     cell.annotation = well7.md$Main_molecular_cell_type,)
+                                     cell.annotation = well7.md$Main_molecular_cell_type)
 
 print("Done")
 
@@ -142,7 +142,8 @@ MC_centroids <- supercell_spatial_centroids(MC.well7_DLS.spl,spotPositions = spo
 
 MC.ge <- superspot_GE(MC = MC.well7_DLS.spl,
   ge = well7.mtx %>% as.matrix(),
-  groups = as.numeric(MC.well7_DLS.spl$membership)
+  groups = as.numeric(MC.well7_DLS.spl$membership),
+  mode = "sum"
 )
 
 MC.seurat <- supercell_2_Seuratv5(

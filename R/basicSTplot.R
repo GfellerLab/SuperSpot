@@ -58,38 +58,62 @@ supercell_metaspots_shape <- function(MC, spotpositions,annotation,concavity,mem
 #'
 #'
 
-SpatialDimPlotSC <- function(original_coord, 
+SpatialDimPlotSC <- function(original_coord,
                               MC,
                               sc.col = NULL,
                               sc.col2 = NULL,
                               polygons_col,
                               alpha = 1,
                               meta_data,
-                              alpha_hull = 0.5) {
-  
+                              alpha_hull = 0.5,
+                             spot.color = NULL) {
+
   membership <- MC$membership
   seuratCoord <- original_coord
-  
+
   seuratCoordMetacell <-  cbind(seuratCoord,membership)
 
   hull_df_final <- MC[[polygons_col]]
-  
+
   seuratCoordMetacell <- data.frame(seuratCoordMetacell)
   seuratCoordMetacell[[sc.col]] <- meta_data[[sc.col]]
   seuratCoordMetacell[[sc.col2]] <- meta_data[[sc.col2]]
   seuratCoordMetacell[["cell_type"]] <- seuratCoordMetacell[[sc.col]]
   seuratCoordMetacell[["MC_membership"]] <- seuratCoordMetacell[[sc.col2]]
-  
+
   seuratCoordMetacell[["MC_membership"]][duplicated(seuratCoordMetacell[["MC_membership"]]) == TRUE] -> dupli.memb
   seuratCoordMetacell[! seuratCoordMetacell[["MC_membership"]] %in% dupli.memb,] -> seuratCoord.uni
-  
-  
-  p <- ggplot2::ggplot(seuratCoordMetacell) + 
-    ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),alpha = alpha) + 
-    geom_polygon(data = hull_df_final, aes(x = x, y = y, fill = cell_type, group = membership), alpha = alpha_hull, color = "black", linetype = "solid")+
-    geom_point(data = seuratCoord.uni,mapping = aes(x = imagecol, y=imagerow),size = 0.5)+
-    scale_y_reverse()
-  
-  
+
+  if (is.null(spot.color)){
+    p <- ggplot2::ggplot(seuratCoordMetacell) +
+      ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),
+                          alpha = alpha) +
+      geom_polygon(data = hull_df_final,
+                   aes(x = x, y = y, fill = cell_type, group = membership),
+                   alpha = alpha_hull,
+                   color = "black",
+                   linetype = "solid")+
+      geom_point(data = seuratCoord.uni,
+                 mapping = aes(x = imagecol, y=imagerow),
+                 size = 0.5)+
+      scale_y_reverse()
+  }
+  else{
+    p <- ggplot2::ggplot(seuratCoordMetacell) +
+      ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),
+                          alpha = alpha) +
+      geom_polygon(data = hull_df_final,
+                   aes(x = x, y = y, fill = cell_type, group = membership),
+                   alpha = alpha_hull,
+                   color = "black",
+                   linetype = "solid") +
+      scale_fill_manual(values = spot.color) +
+      scale_color_manual(values = spot.color) +
+      geom_point(data = seuratCoord.uni,
+                 mapping = aes(x = imagecol, y=imagerow),
+                 size = 0.5)+
+      scale_y_reverse()
+  }
+
   return(p)
 }
