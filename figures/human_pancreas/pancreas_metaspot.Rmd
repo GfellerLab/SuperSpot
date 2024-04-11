@@ -14,7 +14,6 @@ library(SuperCell)
 library(tidyr)
 library(tidyverse)
 library(igraph)
-library(Giotto)
 ```
 
 ## Import data
@@ -34,36 +33,7 @@ colnames(mtx.flt) <- rownames(metad)
 spotPosition <- GetTissueCoordinates(panc)[,c("x","y")]
 colnames(spotPosition) <- c("imagerow","imagecol")
 
-distinctive_colors <- c(
-  "#8DA0CB", # Lavender
-  "#377EB8", # Blue
-  "#4DAF4A", # Green
-  "#984EA3", # Purple
-  "#FF7F00", # Orange
-  "#FFFF33", # Yellow
-  "#A65628", # Brown
-  "#F781BF", # Pink
-  "#999999", # Gray
-  "#66C2A5", # Turquoise
-  "#FC8D62", # Coral
-  "#E41A1C"  # Red
-)
-
-distinctive_colors2 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', '#476D87',
-                      '#E95C59', '#E5D2DD', '#AB3282', '#23452F', '#BD956A', '#8C549C', '#585658',
-                      '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
-                      '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
-                      '#712820', '#DCC1DD', '#CCE0F5', '#CCC9E6', '#625D9E', '#68A180', '#3A6963',
-                      '#968175')[1:12] 
-
-distinctive_colors3 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#F8766D",
-                      '#E95C59', '#E5D2DD', '#AB3282', "#8DA0CB", '#BD956A', '#8C549C', '#585658',
-                      '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
-                      '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
-                      '#712820', '#DCC1DD', '#CCE0F5', '#CCC9E6', '#625D9E', '#68A180', '#3A6963',
-                      '#968175')[1:12] 
-
-distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
+distinctive_colors <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
                       '#E95C59', '#E5D2DD', '#AB3282', "#8DA0CB", '#BD956A', '#8C549C', '#585658',
                       '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
                       '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
@@ -73,7 +43,7 @@ distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', 
 plt.df <- cbind(spotPosition,metad[,"cell_type",drop = F])
 ggplot2::ggplot(plt.df) + 
     ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),size = 0.5) +
-  scale_color_manual(values = distinctive_colors2) +
+  scale_color_manual(values = distinctive_colors) +
   scale_y_reverse()+
   theme(panel.background = element_rect(fill="white"),
         plot.background = element_rect(fill="white"),
@@ -149,7 +119,7 @@ SpatialDimPlotSC(original_coord = spotPosition,
                  sc.col = "cell_type",
                  sc.col2 = str_c("MC_membership_spl_",g),
                  polygons_col = "polygons",
-                 meta_data = metad,alpha_hull = 0.5,spot.color = distinctive_colors2)+
+                 meta_data = metad,alpha_hull = 0.5,spot.color = distinctive_colors)+
   theme(panel.background = element_rect(fill="white"),
         plot.background = element_rect(fill="white"),
         panel.grid = element_line(color="white"),
@@ -166,7 +136,6 @@ MC_centroids <- supercell_spatial_centroids(MC.full.spl,spotPositions = spotPosi
 
 MC.ge <- superspot_GE(MC = MC.full.spl,
   ge = mtx.flt %>% as.matrix(),
-  #ge = GetAssayData(MC.full.spl$seurat.object,layer = "data"),
   groups = as.numeric(MC.full.spl$membership),
   mode = "sum"
 )
@@ -178,12 +147,6 @@ MC.seurat <- supercell_2_Seuratv5(
 )
 
 MC.seurat <- NormalizeData(MC.seurat)
-# MC.seurat <- SetAssayData(
-#     object = MC.seurat,
-#     layer = "data",
-#     new.data = GetAssayData(MC.seurat,layer = "counts"),
-#     assay = "RNA"
-# )
 
 MC.seurat <- ScaleData(MC.seurat)
 
@@ -201,7 +164,7 @@ DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors2) -> p
 umap_sized.df <- cbind(p[[1]]$data,MC.full.spl$supercell_size)
 colnames(umap_sized.df)[4] <- "superspot_size"
 ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.5)+ 
-     scale_fill_manual(values=distinctive_colors2)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
+     scale_fill_manual(values=distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
                                                          axis.text = element_text(color="black"),
                                                          axis.title = element_text(color="black"),
                                                          legend.text = element_text(color="black"),axis.line.x = element_line(color="black"),
@@ -219,35 +182,9 @@ proportionZeros
 ```
 
 ```{r}
-Idents(MC.seurat) <- "cell_type" 
-levels(MC.seurat) <- sort(levels(MC.seurat))
-
-VlnPlot(MC.seurat,"nFeature_RNA")+NoLegend()
-
-#Compute marker genes
-mc.markers <-  FindAllMarkers(MC.seurat,
-                                    only.pos = TRUE,
-                                    #min.pct = 0.25,
-                                    logfc.threshold = 0.25 ) %>%
-  filter(p_val_adj < 0.05)
-
-mc.top.markers <- mc.markers %>%
-   group_by(cluster) %>%
-    slice_max(n = 20, order_by = avg_log2FC)
-
-DotPlot(MC.seurat,features = mc.top.markers$gene %>% unique()) + RotatedAxis()
-```
-
-```{r}
 MC.seurat.sb <- subset(MC.seurat, features = rownames(MC.seurat)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(MC.seurat), ignore.case ="True") == FALSE], cell_type != "QC_dropped")
 
 MC.seurat.sb <- NormalizeData(MC.seurat.sb)
-# MC.seurat <- SetAssayData(
-#     object = MC.seurat,
-#     layer = "data",
-#     new.data = GetAssayData(MC.seurat,layer = "counts"),
-#     assay = "RNA"
-# )
 
 MC.seurat.sb <- ScaleData(MC.seurat.sb)
 
@@ -273,113 +210,39 @@ ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_si
 
 ```
 
-
-```{r}
-sp.top.markers <- readxl::read_xlsx("/Users/admin/Documents/These/data/PancreasCosMx/spot_top_markers.xlsx")
-```
-
-```{r}
-tpr <- c()
-for (cl in unique(sp.top.markers$cluster)){
-  sb.spot <- subset(sp.top.markers, cluster == cl)
-  sb.metaspot <- subset(mc.top.markers, cluster == cl)
-  com.genes <- intersect(sb.spot$gene,sb.metaspot$gene)
-  score <- length(com.genes)/length(sb.spot$gene)*100
-  tpr <- c(tpr,score)
-}
-names(tpr) <- unique(sp.top.markers$cluster)
-tpr
-```
-
-```{r}
-for (cl in unique(sp.markers$cluster)){
-  sb.spot <- subset(sp.markers, cluster == cl)%>%
-  filter(p_val_adj < 0.05)
-  sb.metaspot <- subset(mc.markers, cluster == cl)%>%
-  filter(p_val_adj < 0.05)
-  plot(ggvenn::ggvenn(list(spot = sb.spot$gene, metaspot = sb.metaspot$gene),show_percentage = F,text_size = 10,auto_scale = T),main = cl)
-}
-```
-
-
-## Subsampling
-```{r}
-cell.ids <- sample(colnames(mtx.flt),ncol(mtx.flt)/2.6)
-mtx.sb <- mtx.flt[,cell.ids]
-metad.sb <- metad[cell.ids,]
-sb.so <- CreateSeuratObject(mtx.sb,meta.data = metad)
-```
-
-```{r}
-sb.so <- NormalizeData(sb.so)
-
-sb.so <- ScaleData(sb.so)
-
-sb.so <- FindVariableFeatures(sb.so)
-
-sb.so <- RunPCA(sb.so)
-
-sb.so <- RunUMAP(sb.so, dims = 1:30)
-
-DimPlot(sb.so, reduction = "umap", group.by = "cell_type")
-```
-
-```{r}
-Idents(sb.so) <- "cell_type" 
-levels(sb.so) <- sort(levels(sb.so))
-
-VlnPlot(sb.so,"nFeature_RNA")+NoLegend()
-
-#Compute marker genes
-sb.markers <-  FindAllMarkers(sb.so,
-                                    only.pos = TRUE,
-                                    #min.pct = 0.25,
-                                    logfc.threshold = 0.25 ) %>%
-  filter(p_val_adj < 0.05)
-
-sb.top.markers <- sb.markers %>%
-   group_by(cluster) %>%
-    slice_max(n = 20, order_by = avg_log2FC)
-
-DotPlot(sb.so,features = sb.top.markers$gene %>% unique()) + RotatedAxis()
-```
-
-```{r}
-sp.top.markers <- readxl::read_xlsx("/Users/admin/Documents/These/data/PancreasCosMx/spot_top_markers.xlsx")
-```
-
-```{r}
-sb.tpr <- c()
-for (cl in unique(sp.top.markers$cluster)){
-  sb.spot <- subset(sp.top.markers, cluster == cl)
-  sb.subsamp <- subset(sb.top.markers, cluster == cl)
-  com.genes <- intersect(sb.spot$gene,sb.subsamp$gene)
-  score <- length(com.genes)/length(sb.spot$gene)*100
-  sb.tpr <- c(sb.tpr,score)
-}
-names(sb.tpr) <- unique(sp.top.markers$cluster)
-sb.tpr
-mean(sb.tpr)
-```
-
-```{r}
-test <- readxl::read_xlsx("/Users/admin/Documents/GitHub/SuperSpot/results_MC_spl.xlsx")
-plot(1:20, test$min, type = 'b', col = 'blue', ylim = range(c(test$min)), ylab = 'Recquired Time')
-par(new = TRUE)
-plot(1:20, test$mem_alloc, type = 'b', col = 'red', ylim = range(test$mem_alloc), axes = FALSE, xlab = '', ylab = '')
-axis(side = 4)
-```
-
-
-```{r}
-test2 <- readxl::read_xlsx("/Users/admin/Documents/GitHub/SuperSpot/results_MC.xlsx")
-plot(1:20, test2$min, type = 'b', col = 'blue', ylim = range(c(test2$min)), ylab = 'Recquired Time')
-par(new = TRUE)
-plot(1:20, test2$mem_alloc, type = 'b', col = 'red', ylim = range(test2$mem_alloc), axes = FALSE, xlab = '', ylab = '')
-axis(side = 4)
-```
-
 ## Acinar.1
+
+```{r}
+nano.obj <- LoadNanostring(data.dir = "/Users/admin/Documents/These/data/PancreasCosMx", fov = "pancreas")
+
+# add in precomputed annotations
+meta <- readRDS("/Users/admin/Documents/These/data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+meta$new_cell_ID <- sub("c_1_(\\d+)_(\\d+)", "\\2_\\1", meta$cell_ID)
+rownames(meta) <- meta$new_cell_ID
+nano.obj@meta.data$types <- meta[rownames(nano.obj@meta.data), "cell_types"]
+nano.obj@meta.data$types[is.na(nano.obj@meta.data$types)] <- "QC_dropped"
+Idents(nano.obj) <- nano.obj$types
+
+# set to avoid error exceeding max allowed size of globals
+options(future.globals.maxSize = 8000 * 1024^2)
+
+nano.obj.sb <- subset(nano.obj, features = rownames(nano.obj)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(nano.obj), ignore.case ="True") == FALSE], types != "QC_dropped")
+nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T)
+nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T)
+nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T)
+nano.obj.sb <- RunPCA(nano.obj.sb, verbose = T)
+nano.obj.sb <- RunUMAP(nano.obj.sb, verbose = T, dims = 1:30)
+levels(nano.obj.sb) <- sort(levels(nano.obj.sb))
+distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
+                      '#E95C59', '#E5D2DD', '#AB3282', "#8DA0CB", '#BD956A', '#8C549C', '#585658',
+                      '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
+                      '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
+                      '#712820', '#DCC1DD', '#CCE0F5', '#CCC9E6', '#625D9E', '#68A180', '#3A6963',
+                      '#968175')[1:11] 
+DimPlot(nano.obj.sb,cols = distinctive_colors4)+theme(axis.ticks.length=unit(.25, "cm"))+NoLegend()
+DimPlot(nano.obj.sb,cols = distinctive_colors4)+theme(axis.ticks.length=unit(.25, "cm"))
+```
+
 
 ```{r}
 # Step 1: Identify the cell type of interest in metadata (e.g., using the 'idents' function)
@@ -446,72 +309,3 @@ ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot",
         text = element_text(size = 20)) +
   RotatedAxis()+NoLegend()
 ```
-
-## Acinar.2
-
-```{r}
-# Step 1: Identify the cell type of interest in metadata (e.g., using the 'idents' function)
-# Let's say your cell types are stored in a metadata column named 'cell_type'
-#cell_types <- Idents(object = seurat_object)
-
-# Step 2: Filter cells belonging to the cell type of interest
-cells_of_interest <- WhichCells(object = nano.obj, idents = "Acinar.2")
-
-# Step 3: Calculate the percentage of these cells expressing the gene of interest
-# Define the gene of interest
-gene_of_interest <- "PNLIPRP1"
-
-# Fetch the expression data for the gene of interest
-expression_data <- FetchData(object = nano.obj, vars = gene_of_interest, cells = cells_of_interest)
-
-# Determine the number of cells with expression > 0 (or another threshold if preferred)
-expressing_cells_count <- sum(expression_data[[gene_of_interest]] > 0)
-
-# Calculate the percentage
-percentage_expressing <- expressing_cells_count / length(cells_of_interest) * 100
-
-# Print the result
-percentage_expressing
-```
-
-
-```{r}
-# Step 1: Identify the cell type of interest in metadata (e.g., using the 'idents' function)
-# Let's say your cell types are stored in a metadata column named 'cell_type'
-#cell_types <- Idents(object = seurat_object)
-
-# Step 2: Filter cells belonging to the cell type of interest
-cells_of_interest.mc <- WhichCells(object = MC.seurat, idents = "Acinar.1")
-
-# Step 3: Calculate the percentage of these cells expressing the gene of interest
-# Define the gene of interest
-gene_of_interest.mc <- "PNLIPRP1"
-
-# Fetch the expression data for the gene of interest
-expression_data.mc <- FetchData(object = MC.seurat, vars = gene_of_interest.mc, cells = cells_of_interest.mc)
-
-# Determine the number of cells with expression > 0 (or another threshold if preferred)
-expressing_cells_count.mc <- sum(expression_data.mc[[gene_of_interest.mc]] > 0)
-
-# Calculate the percentage
-percentage_expressing.mc <- expressing_cells_count.mc / length(cells_of_interest.mc) * 100
-
-# Print the result
-percentage_expressing.mc
-```
-
-```{r}
-barplot(c(35.59037,43.75254))
-VlnPlot(nano.obj,"PNLIPRP1",idents = "Acinar.1") -> v1
-VlnPlot(MC.seurat,"PNLIPRP1",idents = "Acinar.1") -> v2
-
-vln.df <- rbind(v1[[1]][["data"]],v2[[1]][["data"]])
-vln.df$Condition <- c(rep("spot",nrow(v1[[1]][["data"]])),rep("metaspot",nrow(v2[[1]][["data"]])))
-ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),aes(x = Condition, y = PNLIPRP1, fill = Condition))+geom_violin()+
-  theme_bw() +
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        text = element_text(size = 20)) +
-  RotatedAxis()+NoLegend()
-```
-
