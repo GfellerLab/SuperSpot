@@ -115,7 +115,8 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     so <- ScaleData(so)
     if (max_gamma != 1){
       so <- RunPCA(so,verbose = F)
-      pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
+      #ßpca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
+      pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,n.pc]
     }
     else {
       pca_matrix <- matrix(0,ncol(countMatrix),n.pc)
@@ -247,7 +248,7 @@ SCimplify_SpatialDLS <- function(X,
                                 gamma = 10,
                                 k.knn = 6,
                                 do.scale = TRUE,
-                                n.pc = 5,
+                                n.pc = 1:30,
                                 n.cpu = NULL,
                                 plot.graph = FALSE,
                                 pct = 0.6,
