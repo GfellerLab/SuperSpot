@@ -11,8 +11,6 @@ editor_options:
 
 ```{r}
 reticulate::use_miniconda("/Users/admin/miniconda3")
-
-#reticulate::use_miniconda("/Users/admin/miniconda3/envs/cellcharter")
 ```
 
 
@@ -32,12 +30,8 @@ library(ggplot2)
 library(dplyr)
 library(hdf5r)
 library(scales)
-#library(SeuratDisk)
 library(ggpubr)
-#library(spatialLIBD)
-#library(BayesSpace)
 library(networkD3)
-#library(SeuratData)
 library(ggforce)
 library(clusterProfiler)
 library(SuperSpot)
@@ -47,18 +41,13 @@ library(SuperSpot)
 ```{python}
 import anndata as ad
 import squidpy as sq
-#import cellcharter as cc
 import pandas as pd
 import scanpy as sc
-#import scvi
 import numpy as np
 import matplotlib.pyplot as plt
-
+import random
 import os
 import torch
-#import pandas as pd
-#import scanpy as sc
-#import squidpy as sq
 from sklearn import metrics
 import multiprocessing as mp
 import GraphST
@@ -70,6 +59,7 @@ import STAGATE
 ### GraphST
 
 ```{python}
+seed_values = [random.randint(1, 10000) for _ in range(10)]
 adata = sc.read_visium(path="/Users/admin/Downloads/151673", count_file='filtered_feature_bc_matrix.h5')
 adata.var_names_make_unique()
 ```
@@ -85,41 +75,23 @@ os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.3-arm64/Resou
 ```
 
 ```{python}
-# the number of clusters
-n_clusters = 7
+for i in range (0,10):
+  # the number of clusters
+  n_clusters = 7
+  dataset = '151673'
+  # define model
+  model = GraphST.GraphST(adata, device=device,random_seed=seed_values[i])
+  # train model
+  adata = model.train()
+  # set radius to specify the number of neighbors considered during refinement
+  radius = 50
+  tool = 'mclust' # mclust, leiden, and louvain
+  # clustering
+  from GraphST.utils import clustering
+  clustering(adata, n_clusters, radius=radius, method=tool, refinement=True) # For DLPFC dataset, we use optional refinement   step.
+  print(i)
+  adata.obs['mclust'].to_excel(f"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot/graphST_clustering_{i}.xlsx")
 
-dataset = '151673'
-
-# define model
-model = GraphST.GraphST(adata, device=device)
-
-# train model
-adata = model.train()
-
-# set radius to specify the number of neighbors considered during refinement
-radius = 50
-
-tool = 'mclust' # mclust, leiden, and louvain
-
-# clustering
-from GraphST.utils import clustering
-
-if tool == 'mclust':
-   clustering(adata, n_clusters, radius=radius, method=tool, refinement=True) # For DLPFC dataset, we use optional refinement step.
-elif tool in ['leiden', 'louvain']:
-   clustering(adata, n_clusters, radius=radius, method=tool, start=0.1, end=2.0, increment=0.01, refinement=False)
-```
-
-```{python}
-sc.pl.spatial(adata,
-              img_key="hires",
-              color=["domain"],
-              #title=["Ground truth", "ARI=%.4f"%ARI],
-              show=True)
-```
-
-```{python}
-adata.obs['mclust'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/graphST_clustering.xlsx")
 ```
 
 ### STAGATE
@@ -136,31 +108,29 @@ sc.pp.log1p(adata)
 
 ```{python}
 import tensorflow.compat.v1 as tf
-tf.disable_eager_execution()
-
-STAGATE.Cal_Spatial_Net(adata, rad_cutoff=150)
-STAGATE.Stats_Spatial_Net(adata)
-
-adata = STAGATE.train_STAGATE(adata, alpha=0)
 
 
-sc.pp.neighbors(adata, use_rep='STAGATE')
-sc.tl.umap(adata)
-adata = STAGATE.mclust_R(adata, used_obsm='STAGATE', num_cluster=7)
+for i in range (0,10):
+  tf.disable_eager_execution()
 
-sc.pl.spatial(adata, color=["mclust"], title=['STAGATE'])
+  STAGATE.Cal_Spatial_Net(adata, rad_cutoff=150)
+  STAGATE.Stats_Spatial_Net(adata)
 
-```
+  adata = STAGATE.train_STAGATE(adata, alpha=0,random_seed=seed_values[i])
 
-```{python}
-adata.obs['mclust'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/STAGATE_clustering.xlsx")
+
+  sc.pp.neighbors(adata, use_rep='STAGATE')
+  sc.tl.umap(adata)
+  adata = STAGATE.mclust_R(adata, used_obsm='STAGATE', num_cluster=7)
+
+  #sc.pl.spatial(adata, color=["mclust"], title=['STAGATE'])
+  adata.obs['mclust'].to_excel(f"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot/STAGATE_clustering{i}.xlsx")
+
 ```
 
 ### CellCharter
 
 ```{r}
-#reticulate::use_miniconda("/Users/admin/miniconda3")
-
 reticulate::use_miniconda("/Users/admin/miniconda3/envs/cellcharter-env")
 ```
 
@@ -174,15 +144,14 @@ import scanpy as sc
 import scvi
 import numpy as np
 import matplotlib.pyplot as plt
+import random
+
+seed_values = [random.randint(1, 10000) for _ in range(10)]
 
 
-#adata_list = []
 adata = sc.read_visium(path="/Users/admin/Downloads/151673", count_file='filtered_feature_bc_matrix.h5')
 adata.var_names_make_unique()
 adata
-
-# Flip y axis
-#adata.obsm['spatial_fov'][:, 1] = np.max(adata.obsm['spatial_fov'][:, 1]) - adata.obsm['spatial_fov'][:, 1]
 
 # Remove negative probes
 adata = adata[:, [c for c in adata.var_names if 'NegPrb' not in c]].copy()
@@ -194,9 +163,6 @@ adata.obs['sample'] = "151673"
 
 ```{python}
 
-# 'spatial_fov' refers to global coordinates of the cells.
-# Thus, we are going to use 'spatial_fov' and not 'spatial' as spatial coordinates.
-#adata.uns['spatial_fov'] = {s: {} for s in adata.obs['sample'].unique()}
 adata.obs['sample'] = pd.Categorical(adata.obs['sample'])
 #adata.uns['spatial'] = pd.Categorical(adata.uns['spatial'])
 adata
@@ -205,8 +171,6 @@ adata
 ```{python}
 sc.pp.filter_genes(adata, min_counts=3)
 adata
-#sc.pp.filter_cells(adata, min_counts=3)
-#adata
 adata.layers["counts"] = adata.X.copy()
 
 sc.pp.normalize_total(adata, target_sum=1e6)
@@ -216,68 +180,64 @@ adata
 ```
 
 ```{python}
-scvi.settings.seed = 12345
-scvi.model.SCVI.setup_anndata(
+for i in range (0,10):
+  scvi.settings.seed = seed_values[i]
+  scvi.model.SCVI.setup_anndata(
     adata, 
     layer="counts", 
     batch_key='sample'
-)
+  )
 
-model = scvi.model.SCVI(adata)
-model.train(early_stopping=True, enable_progress_bar=True)
+  model = scvi.model.SCVI(adata)
+  model.train(early_stopping=True, enable_progress_bar=True)
 
-adata.obsm['X_scVI'] = model.get_latent_representation(adata).astype(np.float32)
-```
+  adata.obsm['X_scVI'] = model.get_latent_representation(adata).astype(np.float32)
 
-```{python}
-sq.gr.spatial_neighbors(adata, library_key='sample', coord_type='generic', delaunay=True, spatial_key='spatial')
-cc.gr.remove_long_links(adata)
+  sq.gr.spatial_neighbors(adata, library_key='sample', coord_type='generic', delaunay=True, spatial_key='spatial')
+  cc.gr.remove_long_links(adata)
 
-cc.gr.aggregate_neighbors(adata, n_layers=3, use_rep='X_scVI', out_key='X_cellcharter', sample_key='sample')
+  cc.gr.aggregate_neighbors(adata, n_layers=3, use_rep='X_scVI', out_key='X_cellcharter', sample_key='sample')
 
-autok = cc.tl.ClusterAutoK(
-    n_clusters=(2,10), 
-    max_runs=10, 
-    model_params=dict(
-        random_state=12345
-        # If running on GPU
-        #trainer_params=dict(accelerator='gpu', devices=1)
-    )
-)
 
-autok.fit(adata, use_rep='X_cellcharter')
 
-plt.close()
-cc.pl.autok_stability(autok)
-plt.show()
-plt.close()
-```
+  autok = cc.tl.ClusterAutoK(
+     n_clusters=(2,10), 
+      max_runs=10, 
+      model_params=dict(
+          random_state=seed_values[i]
+          # If running on GPU
+          #trainer_params=dict(accelerator='gpu', devices=1)
+      )
+  )
 
-```{python}
-adata.obs['cluster_cellcharter'] = autok.predict(adata, use_rep='X_cellcharter')
+  autok.fit(adata, use_rep='X_cellcharter')
 
-sq.pl.spatial_scatter(
-    adata, 
-    color=['cluster_cellcharter'], 
-    library_key='sample',  
-    size=1, 
-    img=None,
-    spatial_key='spatial',
-    palette='Set2',
-    #connectivity_key='spatial_connectivities',
-    #img_alpha=0.3,
-    figsize=(15,15),
-    ncols=1,
-    #library_id=adata.obs['sample'].unique(),
-    library_id=['151673'],
-)
+  #plt.close()
+  #cc.pl.autok_stability(autok)
+  #plt.show()
+  #plt.close()
+  adata.obs['cluster_cellcharter'] = autok.predict(adata, use_rep='X_cellcharter',k=7)
 
-plt.show()
-plt.close()
-```
+  sq.pl.spatial_scatter(
+      adata, 
+      color=['cluster_cellcharter'], 
+      library_key='sample',  
+      size=1, 
+      img=None,
+      spatial_key='spatial',
+      palette='Set2',
+      #connectivity_key='spatial_connectivities',
+      #img_alpha=0.3,
+      figsize=(15,15),
+      ncols=1,
+      #library_id=adata.obs['sample'].unique(),
+      library_id=['151673'],
+  )
 
-```{python}
-adata.obs['cluster_cellcharter'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/cellcharter_clustering.xlsx")
+  #plt.show()
+  #plt.close()
+  adata.obs['cluster_cellcharter'].to_excel(f"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot/cellcharter_clustering_{i}.xlsx")
+
 ```
 
 ## Cluster in R
@@ -285,9 +245,10 @@ adata.obs['cluster_cellcharter'].to_excel("/Users/admin/Documents/These/Output/S
 library("DR.SC")
 library(Seurat)
 library(SeuratData)
-library(BPCells)
+#library(BPCells)
 library(dplyr)
 options(Seurat.object.assay.version = "v5")
+seed_values <- sample(1:10000, 10, replace = FALSE)
 
 dlpfc151673 <- Load10X_Spatial("/Users/admin/Downloads/151673")
 
@@ -304,7 +265,9 @@ so <- NormalizeData(so)
 seu <- FindVariableFeatures(so, nfeatures = 500, verbose = T)
 
 ```
+
 ```{r}
+for (i in 1:10){
 ### Given K
 seu <- DR.SC(seu, K=7, platform = 'Visium', verbose=F)
 #Visualization
@@ -317,7 +280,14 @@ drscPlot(seu)
 
 dlpfc151673@meta.data$dr.sc <- seu$spatial.drsc.cluster
 SpatialDimPlot(dlpfc151673,group.by = "dr.sc")
+dr.sc.df <- dlpfc151673@meta.data[,"dr.sc",drop = F]
+dr.sc.df$cell <- colnames(dlpfc151673)
+
+writexl::write_xlsx(dr.sc.df,path = paste0("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot/dr_sc_clustering_",i,".xlsx"))
+
+}
 ```
+
 ```{r}
 library(BayesSpace)
 #dlpfc151673 <- NormalizeData(dlpfc151673)
@@ -328,18 +298,22 @@ insh@colData@listData$col <- dlpfc151673@images[["slice1"]]@coordinates[["col"]]
 insh@colData@listData$imagerow <- dlpfc151673@images[["slice1"]]@coordinates[["imagerow"]]
 insh@colData@listData$imagecol <- dlpfc151673@images[["slice1"]]@coordinates[["imagecol"]]
 
-set.seed(102)
-insh <- spatialPreprocess(insh, platform="Visium",n.PCs=7, n.HVGs=2000, log.normalize=T)
-#insh <- qTune(insh, qs=seq(2, 50), platform="ST", d=7)
-qPlot(insh)
+for (i in 1:10){
+  set.seed(seed_values[i])
+  insh <- spatialPreprocess(insh, platform="Visium",n.PCs=7, n.HVGs=2000, log.normalize=T)
+  qPlot(insh)
 
-set.seed(149)
-insh <- spatialCluster(insh, q=7, platform="Visium", d=7,init.method="mclust", model="t", gamma=2,nrep=1000, burn.in=100,save.chain=TRUE)
-head(colData(insh))
+  set.seed(seed_values[i])
+  insh <- spatialCluster(insh, q=7, platform="Visium", d=7,init.method="mclust", model="t", gamma=2,nrep=1000, burn.in=100,save.chain=TRUE)
+  head(colData(insh))
 
-clusterPlot(insh)
+  clusterPlot(insh)
+  bayespace.df <- colData(insh)[,"spatial.cluster",drop = F] %>% as.data.frame()
+  bayespace.df$cell <- colnames(dlpfc151673)
+  
+  writexl::write_xlsx(bayespace.df,path = paste0("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot/bayespace_clustering_",i,".xlsx"))
+}
 
-clusterPlot(insh)
 ```
 
 ```{r}
@@ -349,790 +323,7 @@ dr.sc.df$cell <- colnames(dlpfc151673)
 bayespace.df <- colData(insh)[,"spatial.cluster",drop = F] %>% as.data.frame()
 bayespace.df$cell <- colnames(dlpfc151673)
 
-writexl::write_xlsx(dr.sc.df,path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/dr_sc_clustering.xlsx")
-writexl::write_xlsx(bayespace.df,path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/bayespace_clustering.xlsx")
-```
-
-
-
-## Compairing ARI
-```{r}
-graphst_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/graphST_clustering.xlsx")
-
-stagate_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/STAGATE_clustering.xlsx")
-
-cellcharter_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/cellcharter_clustering.xlsx")
-
-metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
-
-graphst_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/graphST_clustering.xlsx")
-
-dr.sc_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/dr_sc_clustering.xlsx") %>% column_to_rownames("cell")
-
-bayespace_clustering <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/bayespace_clustering.xlsx") %>% column_to_rownames("cell")
-```
-
-```{r}
-annotation_list <- list()
-annotation_list$manual_annotation <- metadata_151673[,c("layer_guess"),drop = F]
-annotation_list$graphst_clustering <- graphst_clustering %>% column_to_rownames("...1")
-annotation_list$stagate_clustering <- stagate_clustering %>% column_to_rownames("...1")
-annotation_list$cellcharter_clustering <- cellcharter_clustering %>% column_to_rownames("...1")
-annotation_list$dr.sc_clustering <- dr.sc_clustering 
-annotation_list$bayesspace_clustering <- bayespace_clustering
-```
-
-
-```{r}
-ari_matrix <- matrix(nrow = 6, ncol = 6)
-
-for (i in 1:6){
-  for (j in 1:6){
-    clusts_1 <- na.omit(annotation_list[[i]])
-    clusts_2 <- na.omit(annotation_list[[j]])
-    common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
-    new_clusts_1 <- clusts_1[common_cells,]
-    new_clusts_2 <- clusts_2[common_cells,]
-    print(aricode::ARI(new_clusts_1,new_clusts_2))
-    ari_matrix[i,j] <- aricode::ARI(new_clusts_1,new_clusts_2)
-  }
-}
-
-pheatmap::pheatmap(ari_matrix, display_numbers = TRUE,kmeans_k = NA,cluster_rows = F,cluster_cols = F)
-```
-
-```{r}
-dlpfc151673@meta.data$dr.sc <- seu@meta.data$spatial.drsc.cluster
-dlpfc151673@meta.data$bayesspace <- colData(insh)[,"spatial.cluster"]
-dlpfc151673@meta.data$cellcharter <- cellcharter_clustering$cluster_cellcharter
-dlpfc151673@meta.data$graphst <- graphst_clustering$mclust
-dlpfc151673@meta.data$stagate <- stagate_clustering$mclust
-dlpfc151673@meta.data$annotation <- metadata_151673[,c("layer_guess")]
-
-SpatialDimPlot(dlpfc151673,group.by = "dr.sc")
-SpatialDimPlot(dlpfc151673,group.by = "bayesspace")
-SpatialDimPlot(dlpfc151673,group.by = "cellcharter")
-SpatialDimPlot(dlpfc151673,group.by = "graphst")
-SpatialDimPlot(dlpfc151673,group.by = "stagate")
-SpatialDimPlot(dlpfc151673,group.by = "annotation")
-```
-
-
-## Creating Metaspots
-
-```{r}
-dlpfc151673 <- Load10X_Spatial("/Users/admin/Downloads/151673")
-metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
-dlpfc151673@meta.data$layer_guess <- metadata_151673$layer_guess
-SpatialDimPlot(dlpfc151673,group.by = "layer_guess")
-```
-
-
-```{r}
-#mtx <- dlpfc151673@assays$Spatial@layers$counts# %>% as.data.frame()
-mtx <- GetAssayData(dlpfc151673,assay = "Spatial",slot = "counts")
-
-spotPositions <- GetTissueCoordinates(dlpfc151673)
-
-dlpfc151673 <- FindVariableFeatures(dlpfc151673,nfeatures = 2000)
-hvg <- VariableFeatures(dlpfc151673)
-
-MC_DLS.spl <- SCimplify_SpatialDLS(X = mtx,spotPositions = spotPositions,method_similarity = "1", genes.use = hvg,gamma = 5 , n.pc = 30,method_knn = "1",k.knn = 6 , cell.annotation = dlpfc151673@meta.data$layer_guess , method_normalization = "log_normalize",split_not_connected = T)
-
-dlpfc151673@meta.data$MC_membership_spl <- MC_DLS.spl$membership %>% as.character()
-
-MC_DLS.spl$layer_guess <- supercell_assign(clusters = dlpfc151673@meta.data$layer_guess,supercell_membership = MC_DLS.spl$membership,method = "absolute")
-
-method_purity <- c("max_proportion", "entropy")[1]
-MC_DLS.spl$purity_annot <- supercell_purity(
-  clusters = dlpfc151673@meta.data$layer_guess,
-  supercell_membership = MC_DLS.spl$membership, 
-  method = method_purity
-)
-
-
-MC_DLS.spl$MS_coord <- supercell_spatial_centroids(MC_DLS.spl,spotPositions)
-
-MC_DLS.splv2 <- split_unconnected(MC_DLS.spl)
-dlpfc151673@meta.data$MC_membership_splv2 <- MC_DLS.splv2$membership %>% as.character()
-
-MC_DLS.splv2$layer_guess <- supercell_assign(clusters = dlpfc151673@meta.data$layer_guess,supercell_membership = MC_DLS.splv2$membership,method = "absolute")
-
-MC_DLS.splv2$polygons <- supercell_metaspots_shape(MC = MC_DLS.splv2,spotpositions = spotPositions,annotation = "layer_guess",concavity = 2,membership_name = "membership")
-
-SpatialDimPlotSC(original_coord = spotPositions,MC = MC_DLS.splv2,,
-                    sc.col = "layer_guess",sc.col2 = "MC_membership_splv2",polygons_col = "polygons" ,meta_data = dlpfc151673@meta.data, alpha_hull = 0.5)+
-  theme(panel.background = element_rect(fill="black"),
-        plot.background = element_rect(fill="black"),
-        panel.grid = element_line(color="black"),
-        axis.text = element_text(color="white"),
-        axis.title = element_text(color="white"),
-        legend.background = element_rect(fill="black"),
-        legend.text = element_text(color="white"))+NoLegend()+coord_fixed()
-
-SpatialDimPlotSC(original_coord = spotPositions,MC = MC_DLS.splv2,,
-                    sc.col = "layer_guess",sc.col2 = "MC_membership_splv2",polygons_col = "polygons" ,meta_data = dlpfc151673@meta.data, alpha_hull = 0.5)+
-  theme(panel.background = element_rect(fill="white"),
-        plot.background = element_rect(fill="white"),
-        panel.grid = element_line(color="white"),
-        axis.text = element_text(color="black"),
-        axis.title = element_text(color="black"),
-        legend.background = element_rect(fill="black"),
-        legend.text = element_text(color="black"))+NoLegend()+coord_fixed()
-
-
-
-
-MC_DLS.splv2$MS_coord <- supercell_spatial_centroids(MC_DLS.splv2,spotPositions)
-```
-
-
-
-```{r}
-MC.spl.gev2 <- superspot_GE(MC = MC_DLS.splv2,
-  ge = GetAssayData(dlpfc151673,assay = "Spatial",slot = "counts"),
-  #ge = mtx,
-  groups = MC_DLS.splv2$membership,mode = "sum"
-)
-
-MC.spl.seuratv2 <- supercell_2_Seuratv5(
-  SC.GE = MC.spl.gev2, 
-  SC = MC_DLS.splv2, 
-  fields = c("layer_guess")
-)
-
-MC.spl.seuratv2 <- NormalizeData(MC.spl.seuratv2)
-
-MC.spl.seuratv2 <- ScaleData(MC.spl.seuratv2)
-
-MC.spl.seuratv2 <- FindVariableFeatures(MC.spl.seuratv2)
-
-MC.spl.seuratv2 <- RunPCA(MC.spl.seuratv2)
-
-MC.spl.seuratv2 <- RunUMAP(MC.spl.seuratv2, dims = 1:30)
-
-DimPlot(MC.spl.seuratv2, reduction = "umap", group.by = "layer_guess")
-```
-
-
-```{r}
-write.csv(x = t(GetAssayData(MC.spl.seuratv2,assay = "RNA",slot = "count") %>% as.matrix()),file = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_counts.csv")
-
-rownames(MC_DLS.splv2$MS_coord) <- paste0("X",rownames(MC_DLS.splv2$MS_coord))
-
-write.csv(x = MC_DLS.splv2$MS_coord[,c("imagerow","imagecol")],file = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_positions.csv",row.names = F)
-```
-
-
-```{r}
-tissue_positions <- read.csv("/Users/admin/Downloads/151673/spatial/tissue_positions_list.csv",header = F)
-tissue_positions_sb <- subset(tissue_positions, V1 %in% intersect(names(MC_DLS.splv2$membership),tissue_positions$V1))
-
-identical(names(MC_DLS.splv2$membership),tissue_positions_sb$V1)
-
-tissue_positions_sb <- tissue_positions_sb[match(names(MC_DLS.splv2$membership),tissue_positions_sb$V1),]
-
-identical(names(MC_DLS.splv2$membership),tissue_positions_sb$V1)
-
-tissue_positions_sb$membership <- MC_DLS.splv2$membership
-
-rownames(tissue_positions_sb) <- NULL
-
-tissue_positions_sb <- column_to_rownames(tissue_positions_sb,"V1")
-
-metaspot_tissue_position <- stats::aggregate(tissue_positions_sb %>% as.matrix() ~membership,tissue_positions_sb,mean)
-
-metaspot_tissue_position$membership <- paste0("X",metaspot_tissue_position$membership)
-```
-
-```{r}
-write_csv(metaspot_tissue_position[,1:6],"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspot_tissue_positions_list.csv",col_names = F)
-```
-
-
-## Clustering on Metaspots
-
-
-```{r}
-reticulate::use_miniconda("/Users/admin/miniconda3")
-
-#reticulate::use_miniconda("/Users/admin/miniconda3/envs/cellcharter")
-```
-
-
-### Python Clustering methods
-```{python}
-import anndata as ad
-import squidpy as sq
-#import cellcharter as cc
-import pandas as pd
-import scanpy as sc
-#import scvi
-import numpy as np
-import matplotlib.pyplot as plt
-
-import os
-import torch
-#import pandas as pd
-#import scanpy as sc
-#import squidpy as sq
-from sklearn import metrics
-import multiprocessing as mp
-import GraphST
-import sys
-
-import STAGATE
-```
-
-#### GraphST
-
-```{python}
-#adata_metaspot = sc.read_visium(path="/Users/admin/Downloads/151673", count_file='filtered_feature_bc_matrix.h5')
-adata_metaspot = sc.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_counts.csv")
-adata_metaspot.var_names_make_unique()
-
-metaspot_position = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_positions.csv")
-
-#adata_metaspot.obsm['spatial'] = metaspot_position
-
-
-# Load the spatial coordinates
-spatial_coords = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspot_tissue_positions_list.csv", header=None, index_col=0)
-
-# Assuming 'adata_metaspot' is your AnnData object with the count matrix
-# Make sure that the index of spatial_coords matches the order of the barcodes in adata_metaspot.obs_names
-#adata_metaspot.obsm['spatial'] = spatial_coords.loc[adata_metaspot.obs_names, [4, 5]].to_numpy()
-adata_metaspot.obsm['spatial'] = spatial_coords.loc[:, [4, 5]].to_numpy()
-
-# Add additional metadata_metaspot, if any, such as the image path
-adata_metaspot.uns['spatial'] = {'images': '/Users/admin/Downloads/151673/spatial/tissue_lowres_image.png'}
-```
-
-
-```{python}
-from GraphST import GraphST
-# Run device, by default, the package is implemented on 'cpu'. We recommend using GPU.
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
-
-# the location of R, which is necessary for mclust algorithm. Please replace the path below with local R installation path
-os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.3-arm64/Resources"
-```
-
-```{python}
-# the number of clusters
-n_clusters = 7
-
-dataset = '151673'
-
-# define model
-model = GraphST.GraphST(adata_metaspot, device=device)
-
-# train model
-adata_metaspot = model.train()
-
-# set radius to specify the number of neighbors considered during refinement
-radius = 50
-
-tool = 'mclust' # mclust, leiden, and louvain
-
-# clustering
-from GraphST.utils import clustering
-
-if tool == 'mclust':
-   clustering(adata_metaspot, n_clusters, radius=radius, method=tool, refinement=True) # For DLPFC dataset, we use optional refinement step.
-elif tool in ['leiden', 'louvain']:
-   clustering(adata_metaspot, n_clusters, radius=radius, method=tool, start=0.1, end=2.0, increment=0.01, refinement=False)
-```
-
-```{python}
-sc.pl.spatial(adata_metaspot,
-              img_key="hires",
-              color=["domain"],
-              #title=["Ground truth", "ARI=%.4f"%ARI],
-              show=True)
-```
-
-```{python}
-adata_metaspot.obs['mclust'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/graphST_clustering_metaspot.xlsx")
-```
-
-#### STAGATE
-```{python}
-os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.3-arm64/Resources"
-os.environ['R_USER'] = '/Users/admin/miniconda3/lib/python3.10/site-packages/rpy2'
-#adata_metaspot = sc.read_visium(path="/Users/admin/Downloads/151673", count_file='filtered_feature_bc_matrix.h5')
-adata_metaspot.var_names_make_unique()
-#Normalization
-sc.pp.highly_variable_genes(adata_metaspot, flavor="seurat_v3", n_top_genes=3000)
-sc.pp.normalize_total(adata_metaspot, target_sum=1e4)
-sc.pp.log1p(adata_metaspot)
-```
-
-```{python}
-import tensorflow.compat.v1 as tf
-tf.disable_eager_execution()
-
-STAGATE.Cal_Spatial_Net(adata_metaspot, rad_cutoff=150)
-STAGATE.Stats_Spatial_Net(adata_metaspot)
-
-adata_metaspot = STAGATE.train_STAGATE(adata_metaspot, alpha=0)
-
-
-sc.pp.neighbors(adata_metaspot, use_rep='STAGATE')
-sc.tl.umap(adata_metaspot)
-adata_metaspot = STAGATE.mclust_R(adata_metaspot, used_obsm='STAGATE', num_cluster=7)
-
-sc.pl.spatial(adata_metaspot, color=["mclust"], title=['STAGATE'])
-
-```
-
-```{python}
-adata_metaspot.obs['mclust'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/STAGATE_clustering_metaspot.xlsx")
-```
-
-#### CellCharter
-
-```{r}
-#reticulate::use_miniconda("/Users/admin/miniconda3")
-
-reticulate::use_miniconda("/Users/admin/miniconda3/envs/cellcharter-env")
-```
-
-
-```{python}
-import anndata as ad
-import squidpy as sq
-import cellcharter as cc
-import pandas as pd
-import scanpy as sc
-import scvi
-import numpy as np
-import matplotlib.pyplot as plt
-
-
-#adata_metaspot_list = []
-adata_metaspot = sc.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_counts.csv")
-adata_metaspot.var_names_make_unique()
-
-metaspot_position = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_positions.csv")
-
-#adata_metaspot.obsm['spatial'] = metaspot_position
-
-
-# Load the spatial coordinates
-spatial_coords = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspot_tissue_positions_list.csv", header=None, index_col=0)
-
-# Assuming 'adata_metaspot' is your AnnData object with the count matrix
-# Make sure that the index of spatial_coords matches the order of the barcodes in adata_metaspot.obs_names
-#adata_metaspot.obsm['spatial'] = spatial_coords.loc[adata_metaspot.obs_names, [4, 5]].to_numpy()
-adata_metaspot.obsm['spatial'] = spatial_coords.loc[:, [4, 5]].to_numpy()
-
-# Flip y axis
-#adata_metaspot.obsm['spatial_fov'][:, 1] = np.max(adata_metaspot.obsm['spatial_fov'][:, 1]) - adata_metaspot.obsm['spatial_fov'][:, 1]
-
-# Remove negative probes
-adata_metaspot = adata_metaspot[:, [c for c in adata_metaspot.var_names if 'NegPrb' not in c]].copy()
-    
-adata_metaspot.obs['sample'] = "151673"
-
-
-```
-
-```{python}
-
-# 'spatial_fov' refers to global coordinates of the cells.
-# Thus, we are going to use 'spatial_fov' and not 'spatial' as spatial coordinates.
-#adata_metaspot.uns['spatial_fov'] = {s: {} for s in adata_metaspot.obs['sample'].unique()}
-adata_metaspot.obs['sample'] = pd.Categorical(adata_metaspot.obs['sample'])
-#adata_metaspot.uns['spatial'] = pd.Categorical(adata_metaspot.uns['spatial'])
-adata_metaspot
-```
-
-```{python}
-sc.pp.filter_genes(adata_metaspot, min_counts=3)
-adata_metaspot
-#sc.pp.filter_cells(adata_metaspot, min_counts=3)
-#adata_metaspot
-adata_metaspot.layers["counts"] = adata_metaspot.X.copy()
-
-sc.pp.normalize_total(adata_metaspot, target_sum=1e6)
-sc.pp.log1p(adata_metaspot)
-
-adata_metaspot
-```
-
-```{python}
-scvi.settings.seed = 12345
-scvi.model.SCVI.setup_anndata(
-    adata_metaspot, 
-    layer="counts", 
-    batch_key='sample'
-)
-
-model = scvi.model.SCVI(adata_metaspot)
-model.train(early_stopping=True, enable_progress_bar=True)
-
-adata_metaspot.obsm['X_scVI'] = model.get_latent_representation(adata_metaspot).astype(np.float32)
-```
-
-```{python}
-sq.gr.spatial_neighbors(adata_metaspot, library_key='sample', coord_type='generic', delaunay=True, spatial_key='spatial')
-cc.gr.remove_long_links(adata_metaspot)
-
-cc.gr.aggregate_neighbors(adata_metaspot, n_layers=3, use_rep='X_scVI', out_key='X_cellcharter', sample_key='sample')
-
-autok = cc.tl.ClusterAutoK(
-    n_clusters=(2,10), 
-    max_runs=10, 
-    model_params=dict(
-        random_state=12345
-        # If running on GPU
-        #trainer_params=dict(accelerator='gpu', devices=1)
-    )
-)
-
-autok.fit(adata_metaspot, use_rep='X_cellcharter')
-
-plt.close()
-cc.pl.autok_stability(autok)
-plt.show()
-plt.close()
-```
-
-```{python}
-adata_metaspot.obs['cluster_cellcharter'] = autok.predict(adata_metaspot, use_rep='X_cellcharter',k=7)
-
-sq.pl.spatial_scatter(
-    adata_metaspot, 
-    color=['cluster_cellcharter'], 
-    library_key='sample',  
-    size=1, 
-    img=None,
-    spatial_key='spatial',
-    palette='Set2',
-    #connectivity_key='spatial_connectivities',
-    #img_alpha=0.3,
-    figsize=(15,15),
-    ncols=1,
-    #library_id=adata_metaspot.obs['sample'].unique(),
-    library_id=['151673'],
-)
-
-plt.show()
-plt.close()
-```
-
-```{python}
-adata_metaspot.obs['cluster_cellcharter'].to_excel("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/cellcharter_clustering_metaspot.xlsx")
-```
-
-### Cluster in R
-```{r}
-library("DR.SC")
-library(Seurat)
-library(SeuratData)
-library(BPCells)
-library(dplyr)
-library(tidyverse)
-options(Seurat.object.assay.version = "v5")
-
-tissue_positions <- read.csv("/Users/admin/Downloads/151673/spatial/tissue_positions_list.csv",header = F)
-tissue_positions_sb <- subset(tissue_positions, V1 %in% intersect(names(MC_DLS.splv2$membership),tissue_positions$V1))
-
-identical(names(MC_DLS.splv2$membership),tissue_positions_sb$V1)
-
-tissue_positions_sb <- tissue_positions_sb[match(names(MC_DLS.splv2$membership),tissue_positions_sb$V1),]
-
-identical(names(MC_DLS.splv2$membership),tissue_positions_sb$V1)
-
-tissue_positions_sb$membership <- MC_DLS.splv2$membership
-
-rownames(tissue_positions_sb) <- NULL
-
-tissue_positions_sb <- column_to_rownames(tissue_positions_sb,"V1")
-
-metaspot_tissue_position <- stats::aggregate(tissue_positions_sb %>% as.matrix() ~membership,tissue_positions_sb,mean)
-
-metaspot_tissue_position$membership <- paste0("Cell_",metaspot_tissue_position$membership)
-
-write_csv(metaspot_tissue_position[,1:6],"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/spatial/tissue_positions_list.csv",col_names = F)
-
-count_mtx <- read.csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/metaspots_counts.csv")
-
-dlpfc151673_metaspot <- CreateSeuratObject(counts = t(count_mtx[,2:ncol(count_mtx)]),assay = "Spatial")
-
-metaspot_image <- Read10X_Image("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/spatial")
-
-dlpfc151673_metaspot@images$slice1 <- metaspot_image
-
-SpatialDimPlot(dlpfc151673_metaspot)
-
-count <- dlpfc151673_metaspot@assays$Spatial@layers$counts
-meta_data <- data.frame(row=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]], col=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]])
-row.names(meta_data) <- colnames(count)
-## create Seurat object
-so <- CreateSeuratObject(counts=count, meta.data = meta_data)
-head(so)
-
-# standard log-normalization
-so <- NormalizeData(so)
-# choose 500 highly variable features
-seu <- FindVariableFeatures(so, nfeatures = 500, verbose = T)
-
-```
-
-```{r}
-### Given K
-seu <- DR.SC(seu, K=7, platform = 'Visium', verbose=F)
-#Visualization
-
-spatialPlotClusters(seu)
-#Show the tSNE plot based on the extracted features from DR-SC.
-
-drscPlot(seu)
-#Show the UMAP plot based on the extracted features from DR-SC.
-
-dlpfc151673_metaspot@meta.data$dr.sc_clustering <- seu$spatial.drsc.cluster
-SpatialDimPlot(dlpfc151673_metaspot,group.by = "dr.sc_clustering")
-```
-```{r}
-library(BayesSpace)
-#dlpfc151673_metaspot <- NormalizeData(dlpfc151673_metaspot)
-
-insh <- as.SingleCellExperiment(dlpfc151673_metaspot)
-insh@colData@listData$row <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]]
-insh@colData@listData$col <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]]
-insh@colData@listData$imagerow <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagerow"]]
-insh@colData@listData$imagecol <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagecol"]]
-
-set.seed(102)
-insh <- spatialPreprocess(insh, platform="Visium",n.PCs=7, n.HVGs=2000, log.normalize=T)
-#insh <- qTune(insh, qs=seq(2, 50), platform="ST", d=7)
-qPlot(insh)
-
-set.seed(149)
-insh <- spatialCluster(insh, q=7, platform="Visium", d=7,init.method="mclust", model="t", gamma=3,nrep=1000, burn.in=100,save.chain=TRUE,)
-head(colData(insh))
-
-clusterPlot(insh)
-
-clusterPlot(insh)
-```
-
-
-```{r}
-writexl::write_xlsx(dlpfc151673_metaspot@meta.data[,"dr.sc_clustering",drop = F],"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/DRSC_clustering_metaspot.xlsx")
-writexl::write_xlsx(x = as.data.frame(colData(insh)[,"spatial.cluster",drop = F]),path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/bayespace_clustering_metaspot.xlsx")
-```
-
-
-```{r}
-SeuratDisk::SaveH5Seurat(dlpfc151673_metaspot, filename = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/seurat_object.h5Seurat")
-Convert("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/seurat_object.h5Seurat", dest = "h5ad")
-```
-
-
-### Compairing ARI
-```{r}
-graphst_clustering_metaspot <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/graphST_clustering_metaspot.xlsx")
-
-stagate_clustering_metaspot <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/STAGATE_clustering_metaspot.xlsx")
-
-cellcharter_clustering_metaspot <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/cellcharter_clustering_metaspot.xlsx")
-
-metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
-
-dr.sc_clustering_metaspot <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/DRSC_clustering_metaspot.xlsx")
-
-bayesspace_clustering_metaspot <- readxl::read_xlsx("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking Mouse Cortex/bayespace_clustering_metaspot.xlsx")
-```
-
-```{r}
-annotation_list_metaspot <- list()
-#annotation_list_metaspot$manual_annotation <- metadata_151673[,c("layer_guess"),drop = F]
-annotation_list_metaspot$graphst_clustering <- graphst_clustering_metaspot$mclust #%>% column_to_rownames("...1")
-annotation_list_metaspot$stagate_clustering <- stagate_clustering_metaspot$mclust #%>% column_to_rownames("...1")
-annotation_list_metaspot$cellcharter_clustering <- cellcharter_clustering_metaspot$cluster_cellcharter# %>% column_to_rownames("...1")
-annotation_list_metaspot$dr.sc_clustering <- dr.sc_clustering_metaspot$dr.sc_clustering
-annotation_list_metaspot$bayesspace_clustering <- bayesspace_clustering_metaspot$spatial.cluster
-```
-
-
-```{r}
-ari_matrix_metaspot <- matrix(nrow = 5, ncol = 5)
-
-for (i in 1:5){
-  for (j in 1:5){
-    clusts_1 <- na.omit(annotation_list_metaspot[[i]])
-    clusts_2 <- na.omit(annotation_list_metaspot[[j]])
-    #common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
-    #new_clusts_1 <- clusts_1[common_cells,]
-    #new_clusts_2 <- clusts_2[common_cells,]
-    print(aricode::ARI(clusts_1,clusts_2))
-    ari_matrix_metaspot[i,j] <- aricode::ARI(clusts_1,clusts_2)
-  }
-}
-
-pheatmap::pheatmap(ari_matrix_metaspot, display_numbers = TRUE,kmeans_k = NA,cluster_rows = F,cluster_cols = F,fontsize_number = 10)
-```
-
-```{r}
-dlpfc151673_metaspot@meta.data$BayesSpace_clustering <- bayesspace_clustering_metaspot$spatial.cluster
-SpatialDimPlot(dlpfc151673_metaspot,group.by = "BayesSpace_clustering")
-
-dlpfc151673_metaspot@meta.data$CellCharter_clustering <- cellcharter_clustering_metaspot$cluster_cellcharter
-SpatialDimPlot(dlpfc151673_metaspot,group.by = "CellCharter_clustering")
-
-dlpfc151673_metaspot@meta.data$GraphST_clustering <- graphst_clustering_metaspot$mclust
-SpatialDimPlot(dlpfc151673_metaspot,group.by = "GraphST_clustering")
-
-dlpfc151673_metaspot@meta.data$STAGATE_clustering <- stagate_clustering_metaspot$mclust
-SpatialDimPlot(dlpfc151673_metaspot,group.by = "STAGATE_clustering")
-```
-
-```{r}
-med_tmp <- dlpfc151673@meta.data
-med_tmp$cell.id <- med_tmp %>% rownames()
-
-bayesspace_clustering_metaspot$MC_membership_splv2 <- 1:nrow(bayesspace_clustering_metaspot)
-mapping_ms_bayesspace <- merge(bayesspace_clustering_metaspot[,c("spatial.cluster","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
-
-mapping_ms_bayesspace <- mapping_ms_bayesspace[match(rownames(dlpfc151673@meta.data),mapping_ms_bayesspace$cell.id),]
-dlpfc151673@meta.data$BayesSpace_clustering <- mapping_ms_bayesspace$spatial.cluster
-SpatialDimPlot(dlpfc151673, group.by = "BayesSpace_clustering")
-
-###
-###
-
-cellcharter_clustering_metaspot$MC_membership_splv2 <- 1:nrow(cellcharter_clustering_metaspot)
-mapping_ms_cellcharter <- merge(cellcharter_clustering_metaspot[,c("cluster_cellcharter","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
-
-mapping_ms_cellcharter <- mapping_ms_cellcharter[match(rownames(dlpfc151673@meta.data),mapping_ms_cellcharter$cell.id),]
-dlpfc151673@meta.data$CellCharter_clustering <- mapping_ms_cellcharter$cluster_cellcharter
-SpatialDimPlot(dlpfc151673, group.by = "CellCharter_clustering")
-
-
-###
-###
-
-dr.sc_clustering_metaspot$MC_membership_splv2 <- 1:nrow(dr.sc_clustering_metaspot)
-mapping_ms_dr.sc <- merge(dr.sc_clustering_metaspot[,c("dr.sc_clustering","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
-
-mapping_ms_dr.sc <- mapping_ms_dr.sc[match(rownames(dlpfc151673@meta.data),mapping_ms_dr.sc$cell.id),]
-dlpfc151673@meta.data$dr.sc_clustering <- mapping_ms_dr.sc$dr.sc_clustering
-SpatialDimPlot(dlpfc151673, group.by = "dr.sc_clustering")
-
-
-###
-###
-
-graphst_clustering_metaspot$MC_membership_splv2 <- 1:nrow(graphst_clustering_metaspot)
-mapping_ms_graphst <- merge(graphst_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
-
-mapping_ms_graphst <- mapping_ms_graphst[match(rownames(dlpfc151673@meta.data),mapping_ms_graphst$cell.id),]
-dlpfc151673@meta.data$graphst_clustering <- mapping_ms_graphst$mclust
-SpatialDimPlot(dlpfc151673, group.by = "graphst_clustering")
-
-
-###
-###
-
-stagate_clustering_metaspot$MC_membership_splv2 <- 1:nrow(stagate_clustering_metaspot)
-mapping_ms_stagate <- merge(stagate_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
-
-mapping_ms_stagate <- mapping_ms_stagate[match(rownames(dlpfc151673@meta.data),mapping_ms_stagate$cell.id),]
-dlpfc151673@meta.data$stagate_clustering <- mapping_ms_stagate$mclust
-SpatialDimPlot(dlpfc151673, group.by = "stagate_clustering")
-```
-
-
-```{r}
-annotation_list_metaspot_mapping <- list()
-#annotation_list_metaspot$manual_annotation <- metadata_151673[,c("layer_guess"),drop = F]
-annotation_list_metaspot_mapping$graphst_clustering <- dlpfc151673@meta.data[,"graphst_clustering",drop = F] #%>% column_to_rownames("...1")
-annotation_list_metaspot_mapping$stagate_clustering <- dlpfc151673@meta.data[,"stagate_clustering",drop = F] #%>% column_to_rownames("...1")
-annotation_list_metaspot_mapping$cellcharter_clustering <- dlpfc151673@meta.data[,"CellCharter_clustering",drop = F]# %>% column_to_rownames("...1")
-annotation_list_metaspot_mapping$dr.sc_clustering <- dlpfc151673@meta.data[,"dr.sc_clustering",drop = F]
-annotation_list_metaspot_mapping$bayesspace_clustering <- dlpfc151673@meta.data[,"BayesSpace_clustering",drop = F]
-```
-
-```{r}
-ari_matrix_metaspot_mapping <- matrix(nrow = 5,ncol = 6)
-
-for (i in 1:5){
-  for (j in 1:6){
-    clusts_1 <- na.omit(annotation_list_metaspot_mapping[[i]])
-    clusts_2 <- na.omit(annotation_list[[j]])
-    common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
-    new_clusts_1 <- clusts_1[common_cells,]
-    new_clusts_2 <- clusts_2[common_cells,]
-    print(aricode::ARI(new_clusts_1,new_clusts_2))
-    ari_matrix_metaspot_mapping[i,j] <- aricode::ARI(new_clusts_1,new_clusts_2)
-  }
-}
-
-pheatmap::pheatmap(ari_matrix_metaspot_mapping, display_numbers = TRUE,kmeans_k = NA,cluster_rows = F,cluster_cols = F)
-```
-
-```{r}
-mtx <- matrix(nrow = 5,ncol = 3)
-mtx[,1] <- ari_matrix[2:6,1]
-mtx[,2] <- ari_matrix_metaspot_mapping[,1]
-mtx[1,3] <- ari_matrix_metaspot_mapping[1,2]
-mtx[2,3] <- ari_matrix_metaspot_mapping[2,3]
-mtx[3,3] <- ari_matrix_metaspot_mapping[3,4]
-mtx[4,3] <- ari_matrix_metaspot_mapping[4,5]
-mtx[5,3] <- ari_matrix_metaspot_mapping[5,6]
-pheatmap::pheatmap(mtx, display_numbers = TRUE,kmeans_k = NA,cluster_rows = F,cluster_cols = F,fontsize_number = 40)
-
-pheatmap::pheatmap(Matrix::t(mtx), display_numbers = TRUE,kmeans_k = NA,cluster_rows = F,cluster_cols = F,fontsize_number = 40)
-```
-
-```{r}
-bplot1 <- tibble(ARI = c(0.60,0.60,0.59,0.50,0.44,0.49,0.47,0.50,0.48,0.50), Algorithm = c(rep("GraphST",2),rep("STAGATE",2),rep("CellCharter",2),rep("DR.SC",2),rep("BayesSpace",2)), Condition = c("spot", "metaspot","spot", "metaspot", "spot", "metaspot", "spot", "metaspot", "spot", "metaspot"))
-bplot1_v2 <- bplot1 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")))
-ggplot(bplot1_v2, aes(x = Algorithm, y = ARI, fill = Condition, colour = Condition))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20),legend.position="top")+RotatedAxis()
-
-bplot2 <- tibble(ARI = c(0.56,0.66,0.46,0.47,0.67), Algorithm = c(rep("GraphST",1),rep("STAGATE",1),rep("CellCharter",1),rep("DR.SC",1),rep("BayesSpace",1)))
-ggplot(bplot2, aes(x = Algorithm, y = ARI, fill = Algorithm, ))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20))+RotatedAxis()
-
-bplot3 <- tibble(ARI = c(0.68,0.78,0.47,0.56,0.55,
-                         0.57,0.78,0.47,0.58,0.56,
-                         0.51,0.47,0.47,0.43,0.48,
-                         0.61,0.56,0.58,0.43,0.63,
-                         0.53,0.55,0.56,0.48,0.63), 
-                 Algorithm = c(rep("GraphST",5),
-                               rep("STAGATE",5),
-                               rep("CellCharter",5),
-                               rep("DR.SC",5),
-                               rep("BayesSpace",5)),
-                 Condition = rep(c("metaspot",rep("spot",4)),5),
-                 Against = c("GraphST","STAGATE","CellCharter","DR.SC","BayesSpace",
-                             "STAGATE","GraphST","CellCharter","DR.SC","BayesSpace",
-                             "CellCharter","GraphST","STAGATE","DR.SC","BayesSpace",
-                             "DR.SC","GraphST","STAGATE","CellCharter","BayesSpace",
-                             "BayesSpace","GraphST","STAGATE","CellCharter","DR.SC"))
-ggplot(bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))), aes(x = Algorithm, y = ARI,))+
-  geom_boxplot(data = subset(bplot3, Condition == "spot"),mapping = aes(x = Algorithm, y = ARI,))+
-  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1, aes( fill = Condition),
-               #position=position_dodge(0.1)
-               ) +
-  scale_fill_manual(values = c("metaspot" = "#00BFC4", "spot" = "black")) +
-  theme_bw() +
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        text = element_text(size = 20),legend.position="top") +
-  RotatedAxis()
-
-
-ggplot() +
-    geom_boxplot(data = subset(bplot3, Condition == "spot"), aes(x = Algorithm, y = ARI),outlier.size=0) +
-    geom_point(data = bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),position = position_jitterdodge(jitter.width = 0, dodge.width = 0), size = 5,mapping = aes(x = Algorithm, y = ARI,shape = Against, color = Condition))+
-    theme_bw() +
-    theme(panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          text = element_text(size = 20),
-          legend.position = "top")+
-    RotatedAxis()
+writexl::write_xlsx(dr.sc.df,path = "./Benchmarking Mouse Cortex/dr_sc_clustering.xlsx")
+writexl::write_xlsx(bayespace.df,path = "./Benchmarking Mouse Cortex/bayespace_clustering.xlsx")
 ```
 

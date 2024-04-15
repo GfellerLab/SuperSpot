@@ -1,0 +1,312 @@
+---
+title: "ARI Computations"
+author: "Matei Teleman"
+date: "2024-04-15"
+output: html_document
+---
+```{r}
+library(Seurat)
+library(SeuratData)
+library(dplyr)
+library(tidyverse)
+```
+
+
+```{r}
+metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
+bayespace_results_spots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot", pattern = "bayespace", full.names = TRUE)
+cellcharter_results_spots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot", pattern = "cellcharter", full.names = TRUE)
+dr.sc_results_spots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot", pattern = "dr_sc", full.names = TRUE)
+graphST_results_spots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot", pattern = "graphST", full.names = TRUE)
+STAGATE_results_spots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/spot", pattern = "STAGATE", full.names = TRUE)
+```
+
+## Compute mean ARI
+```{r}
+annotation_list <- c()
+annotation_list$manual_annotation <- c("/Users/admin/Downloads/metadata.tsv")
+annotation_list$graphst_clustering <- graphST_results_spots
+annotation_list$stagate_clustering <- STAGATE_results_spots
+annotation_list$cellcharter_clustering <- cellcharter_results_spots
+annotation_list$dr.sc_clustering <- dr.sc_results_spots 
+annotation_list$bayesspace_clustering <- bayespace_results_spots
+```
+
+```{r}
+ari_matrix <- matrix(nrow = 6, ncol = 6)
+for (i in 1:6){
+  for (j in 1:6){
+    print(i)
+    print(j)
+    aris <- c()
+    for (m in 1:length(annotation_list[[i]])){
+      for (n in 1:length(annotation_list[[j]])){
+        if (grepl("bayespace|dr.sc",annotation_list[[i]][1])){
+          clusts_1 <- na.omit(readxl::read_xlsx(annotation_list[[i]][m]) %>% column_to_rownames("cell"))
+        }
+        if (grepl("metadata",annotation_list[[i]][1])){
+          clusts_1 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
+          clusts_1 <- na.omit(clusts_1[,c("layer_guess"),drop = F])
+        }
+        if (grepl("STAGATE|cellcharter|graphST",annotation_list[[i]][1])){
+           clusts_1 <- na.omit(readxl::read_xlsx(annotation_list[[i]][m]) %>% column_to_rownames("...1"))
+        }
+        if (grepl("bayespace|dr.sc",annotation_list[[j]][1])){
+          clusts_2 <- na.omit(readxl::read_xlsx(annotation_list[[j]][n]) %>% column_to_rownames("cell"))
+        }
+        if (grepl("metadata",annotation_list[[j]][1])){
+          clusts_2 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
+          clusts_2 <- na.omit(clusts_2[,c("layer_guess"),drop = F])
+        }
+        if (grepl("STAGATE|cellcharter|graphST",annotation_list[[j]][1])){
+           clusts_2 <- na.omit(readxl::read_xlsx(annotation_list[[j]][n]) %>% column_to_rownames("...1"))
+        }
+        common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+        new_clusts_1 <- clusts_1[common_cells,]
+        new_clusts_2 <- clusts_2[common_cells,]
+        ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+        aris <- c(aris,ari_tmp)
+      }
+    }
+    ari_matrix[i,j] <- mean(aris)
+  }}    
+    
+```
+
+```{r}
+bayespace_results_metaspots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot", pattern = "bayespace", full.names = TRUE)
+cellcharter_results_metaspots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot", pattern = "cellcharter", full.names = TRUE)
+dr.sc_results_metaspots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot", pattern = "DRSC", full.names = TRUE)
+graphST_results_metaspots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot", pattern = "graphST", full.names = TRUE)
+STAGATE_results_metaspots <- list.files(path = "/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot", pattern = "STAGATE", full.names = TRUE)
+```
+
+```{r}
+dlpfc151673 <- readRDS("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/cortex_with_membership.rds")
+```
+
+```{r}
+med_tmp <- dlpfc151673@meta.data
+med_tmp$cell.id <- med_tmp %>% rownames()
+bayespace_mapping_df <- data.frame(matrix(ncol = 0, nrow = 3639))
+
+for (cl in bayespace_results_metaspots){
+  bayesspace_clustering_metaspot <- readxl::read_xlsx(cl)
+  bayesspace_clustering_metaspot$MC_membership_splv2 <- 1:nrow(bayesspace_clustering_metaspot)
+  mapping_ms_bayesspace <- merge(bayesspace_clustering_metaspot[,c("spatial.cluster","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+  mapping_ms_bayesspace <- mapping_ms_bayesspace[match(rownames(dlpfc151673@meta.data),mapping_ms_bayesspace$cell.id),]
+  bayespace_mapping_df <- cbind(bayespace_mapping_df,mapping_ms_bayesspace$spatial.cluster)
+}
+rownames(bayespace_mapping_df) <- rownames(dlpfc151673@meta.data)
+
+mapping_ms_bayesspace <- mapping_ms_bayesspace[match(rownames(dlpfc151673@meta.data),mapping_ms_bayesspace$cell.id),]
+dlpfc151673@meta.data$BayesSpace_clustering <- mapping_ms_bayesspace$spatial.cluster
+SpatialDimPlot(dlpfc151673, group.by = "BayesSpace_clustering")
+
+###
+###
+
+cellcharter_mapping_df <- data.frame(matrix(ncol = 0, nrow = 3639))
+
+for (cl in cellcharter_results_metaspots){
+  cellcharter_clustering_metaspot <- readxl::read_xlsx(cl)
+  cellcharter_clustering_metaspot$MC_membership_splv2 <- 1:nrow(cellcharter_clustering_metaspot)
+  mapping_ms_cellcharter <- merge(cellcharter_clustering_metaspot[,c("cluster_cellcharter","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+  mapping_ms_cellcharter <- mapping_ms_cellcharter[match(rownames(dlpfc151673@meta.data),mapping_ms_cellcharter$cell.id),]
+  cellcharter_mapping_df <- cbind(cellcharter_mapping_df,mapping_ms_cellcharter$cluster_cellcharter)
+}
+rownames(cellcharter_mapping_df) <- rownames(dlpfc151673@meta.data)
+
+cellcharter_clustering_metaspot$MC_membership_splv2 <- 1:nrow(cellcharter_clustering_metaspot)
+mapping_ms_cellcharter <- merge(cellcharter_clustering_metaspot[,c("cluster_cellcharter","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+
+mapping_ms_cellcharter <- mapping_ms_cellcharter[match(rownames(dlpfc151673@meta.data),mapping_ms_cellcharter$cell.id),]
+dlpfc151673@meta.data$CellCharter_clustering <- mapping_ms_cellcharter$cluster_cellcharter
+SpatialDimPlot(dlpfc151673, group.by = "CellCharter_clustering")
+
+
+###
+###
+
+dr.sc_mapping_df <- data.frame(matrix(ncol = 0, nrow = 3639))
+
+for (cl in dr.sc_results_metaspots){
+  dr.sc_clustering_metaspot <- readxl::read_xlsx(cl)
+  dr.sc_clustering_metaspot$MC_membership_splv2 <- 1:nrow(dr.sc_clustering_metaspot)
+  mapping_ms_dr.sc <- merge(dr.sc_clustering_metaspot[,c("dr.sc_clustering","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+  mapping_ms_dr.sc <- mapping_ms_dr.sc[match(rownames(dlpfc151673@meta.data),mapping_ms_dr.sc$cell.id),]
+  dr.sc_mapping_df <- cbind(dr.sc_mapping_df,mapping_ms_dr.sc$dr.sc_clustering)
+}
+rownames(dr.sc_mapping_df) <- rownames(dlpfc151673@meta.data)
+
+dr.sc_clustering_metaspot$MC_membership_splv2 <- 1:nrow(dr.sc_clustering_metaspot)
+mapping_ms_dr.sc <- merge(dr.sc_clustering_metaspot[,c("dr.sc_clustering","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+
+mapping_ms_dr.sc <- mapping_ms_dr.sc[match(rownames(dlpfc151673@meta.data),mapping_ms_dr.sc$cell.id),]
+dlpfc151673@meta.data$dr.sc_clustering <- mapping_ms_dr.sc$dr.sc_clustering
+SpatialDimPlot(dlpfc151673, group.by = "dr.sc_clustering")
+
+
+###
+###
+
+graphst_mapping_df <- data.frame(matrix(ncol = 0, nrow = 3639))
+
+for (cl in graphST_results_metaspots){
+  graphst_clustering_metaspot <- readxl::read_xlsx(cl)
+  graphst_clustering_metaspot$MC_membership_splv2 <- 1:nrow(graphst_clustering_metaspot)
+  mapping_ms_graphst <- merge(graphst_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+  mapping_ms_graphst <- mapping_ms_graphst[match(rownames(dlpfc151673@meta.data),mapping_ms_graphst$cell.id),]
+  graphst_mapping_df <- cbind(graphst_mapping_df,mapping_ms_graphst$mclust)
+}
+rownames(graphst_mapping_df) <- rownames(dlpfc151673@meta.data)
+
+graphst_clustering_metaspot$MC_membership_splv2 <- 1:nrow(graphst_clustering_metaspot)
+mapping_ms_graphst <- merge(graphst_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+
+mapping_ms_graphst <- mapping_ms_graphst[match(rownames(dlpfc151673@meta.data),mapping_ms_graphst$cell.id),]
+dlpfc151673@meta.data$graphst_clustering <- mapping_ms_graphst$mclust
+SpatialDimPlot(dlpfc151673, group.by = "graphst_clustering")
+
+
+###
+###
+STAGATE_mapping_df <- data.frame(matrix(ncol = 0, nrow = 3639))
+
+for (cl in STAGATE_results_metaspots){
+  STAGATE_clustering_metaspot <- readxl::read_xlsx(cl)
+  STAGATE_clustering_metaspot$MC_membership_splv2 <- 1:nrow(STAGATE_clustering_metaspot)
+  mapping_ms_STAGATE <- merge(STAGATE_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+  mapping_ms_STAGATE <- mapping_ms_STAGATE[match(rownames(dlpfc151673@meta.data),mapping_ms_STAGATE$cell.id),]
+  STAGATE_mapping_df <- cbind(STAGATE_mapping_df,mapping_ms_STAGATE$mclust)
+}
+rownames(STAGATE_mapping_df) <- rownames(dlpfc151673@meta.data)
+
+stagate_clustering_metaspot$MC_membership_splv2 <- 1:nrow(stagate_clustering_metaspot)
+mapping_ms_stagate <- merge(stagate_clustering_metaspot[,c("mclust","MC_membership_splv2")],med_tmp[,c("cell.id" ,"MC_membership_splv2")])
+
+mapping_ms_stagate <- mapping_ms_stagate[match(rownames(dlpfc151673@meta.data),mapping_ms_stagate$cell.id),]
+dlpfc151673@meta.data$stagate_clustering <- mapping_ms_stagate$mclust
+SpatialDimPlot(dlpfc151673, group.by = "stagate_clustering")
+```
+
+```{r}
+aris <- c()
+for (c in 1:10){
+  clusts_1 <- na.omit(bayespace_mapping_df[,c,drop = F])
+  clusts_2 <- na.omit(read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")[,c("layer_guess"),drop = F])
+  common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+  new_clusts_1 <- clusts_1[common_cells,]
+  new_clusts_2 <- clusts_2[common_cells,]
+  ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+  aris <- c(aris,ari_tmp)
+}
+bayespace_ari_mean <- mean(aris)
+```
+
+```{r}
+aris <- c()
+for (c in 1:10){
+  clusts_1 <- na.omit(cellcharter_mapping_df[,c,drop = F])
+  clusts_2 <- na.omit(read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")[,c("layer_guess"),drop = F])
+  common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+  new_clusts_1 <- clusts_1[common_cells,]
+  new_clusts_2 <- clusts_2[common_cells,]
+  ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+  aris <- c(aris,ari_tmp)
+}
+cellcharter_ari_mean <- mean(aris)
+```
+
+```{r}
+aris <- c()
+for (c in 1:10){
+  clusts_1 <- na.omit(dr.sc_mapping_df[,c,drop = F])
+  clusts_2 <- na.omit(read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")[,c("layer_guess"),drop = F])
+  common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+  new_clusts_1 <- clusts_1[common_cells,]
+  new_clusts_2 <- clusts_2[common_cells,]
+  ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+  aris <- c(aris,ari_tmp)
+}
+dr.sc_ari_mean <- mean(aris)
+```
+
+```{r}
+aris <- c()
+for (c in 1:10){
+  clusts_1 <- na.omit(graphst_mapping_df[,c,drop = F])
+  clusts_2 <- na.omit(read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")[,c("layer_guess"),drop = F])
+  common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+  new_clusts_1 <- clusts_1[common_cells,]
+  new_clusts_2 <- clusts_2[common_cells,]
+  ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+  aris <- c(aris,ari_tmp)
+}
+graphst_ari_mean <- mean(aris)
+```
+
+```{r}
+aris <- c()
+for (c in 1:10){
+  clusts_1 <- na.omit(STAGATE_mapping_df[,c,drop = F])
+  clusts_2 <- na.omit(read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")[,c("layer_guess"),drop = F])
+  common_cells <- intersect(rownames(clusts_1),rownames(clusts_2)) %>% sort()
+  new_clusts_1 <- clusts_1[common_cells,]
+  new_clusts_2 <- clusts_2[common_cells,]
+  ari_tmp <- aricode::ARI(new_clusts_1,new_clusts_2)
+  aris <- c(aris,ari_tmp)
+}
+STAGATE_ari_mean <- mean(aris)
+```
+
+##
+
+```{r}
+bplot1 <- tibble(ARI = c(0.60,0.60,0.59,0.50,0.44,0.49,0.47,0.50,0.48,0.50), Algorithm = c(rep("GraphST",2),rep("STAGATE",2),rep("CellCharter",2),rep("DR.SC",2),rep("BayesSpace",2)), Condition = c("spot", "metaspot","spot", "metaspot", "spot", "metaspot", "spot", "metaspot", "spot", "metaspot"))
+bplot1_v2 <- bplot1 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")))
+ggplot(bplot1_v2, aes(x = Algorithm, y = ARI, fill = Condition, colour = Condition))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20),legend.position="top")+RotatedAxis()
+
+bplot2 <- tibble(ARI = c(0.56,0.66,0.46,0.47,0.67), Algorithm = c(rep("GraphST",1),rep("STAGATE",1),rep("CellCharter",1),rep("DR.SC",1),rep("BayesSpace",1)))
+ggplot(bplot2, aes(x = Algorithm, y = ARI, fill = Algorithm, ))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20))+RotatedAxis()
+
+bplot3 <- tibble(ARI = c(0.68,0.78,0.47,0.56,0.55,
+                         0.57,0.78,0.47,0.58,0.56,
+                         0.51,0.47,0.47,0.43,0.48,
+                         0.61,0.56,0.58,0.43,0.63,
+                         0.53,0.55,0.56,0.48,0.63), 
+                 Algorithm = c(rep("GraphST",5),
+                               rep("STAGATE",5),
+                               rep("CellCharter",5),
+                               rep("DR.SC",5),
+                               rep("BayesSpace",5)),
+                 Condition = rep(c("metaspot",rep("spot",4)),5),
+                 Against = c("GraphST","STAGATE","CellCharter","DR.SC","BayesSpace",
+                             "STAGATE","GraphST","CellCharter","DR.SC","BayesSpace",
+                             "CellCharter","GraphST","STAGATE","DR.SC","BayesSpace",
+                             "DR.SC","GraphST","STAGATE","CellCharter","BayesSpace",
+                             "BayesSpace","GraphST","STAGATE","CellCharter","DR.SC"))
+ggplot(bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))), aes(x = Algorithm, y = ARI,))+
+  geom_boxplot(data = subset(bplot3, Condition == "spot"),mapping = aes(x = Algorithm, y = ARI,))+
+  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1, aes( fill = Condition),
+               #position=position_dodge(0.1)
+               ) +
+  scale_fill_manual(values = c("metaspot" = "#00BFC4", "spot" = "black")) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20),legend.position="top") +
+  RotatedAxis()
+
+
+ggplot() +
+    geom_boxplot(data = subset(bplot3, Condition == "spot"), aes(x = Algorithm, y = ARI),outlier.size=0) +
+    geom_point(data = bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),position = position_jitterdodge(jitter.width = 0, dodge.width = 0), size = 5,mapping = aes(x = Algorithm, y = ARI,shape = Against, color = Condition))+
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          text = element_text(size = 20),
+          legend.position = "top")+
+    RotatedAxis()
+```
+
