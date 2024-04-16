@@ -57,7 +57,7 @@ ggplot2::ggplot(plt.df) +
 ## SuperSpot
 ```{r}
 g = 25 # gamma
-n.pc = 30 # number of first PC to use
+n.pc = 1:30 # number of first PC to use
 k.knn = 16 # number of neighbors to connect to each spot
 
 print("Creating metaspots")
@@ -70,7 +70,7 @@ MC.spl <- SCimplify_SpatialDLS(X = mtx.flt,
                                n.pc = n.pc,
                                method_knn = "1",
                                k.knn = k.knn,
-                               method_normalization = "log_normalize",
+                               method_normalization = "SCT",
                                cell.annotation = metad$cell_type,
                                return.seurat.object = TRUE)
 
@@ -146,11 +146,13 @@ MC.seurat <- supercell_2_Seuratv5(
   fields = c("cell_type")
 )
 
-MC.seurat <- NormalizeData(MC.seurat)
+#MC.seurat <- NormalizeData(MC.seurat)
 
-MC.seurat <- ScaleData(MC.seurat)
+#MC.seurat <- ScaleData(MC.seurat)
 
-MC.seurat <- FindVariableFeatures(MC.seurat)
+#MC.seurat <- FindVariableFeatures(MC.seurat)
+
+MC.seurat <- SCTransform(MC.seurat)
 
 MC.seurat <- RunPCA(MC.seurat)
 
@@ -184,11 +186,13 @@ proportionZeros
 ```{r}
 MC.seurat.sb <- subset(MC.seurat, features = rownames(MC.seurat)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(MC.seurat), ignore.case ="True") == FALSE], cell_type != "QC_dropped")
 
-MC.seurat.sb <- NormalizeData(MC.seurat.sb)
+#MC.seurat.sb <- NormalizeData(MC.seurat.sb)
 
-MC.seurat.sb <- ScaleData(MC.seurat.sb)
+#MC.seurat.sb <- ScaleData(MC.seurat.sb)
 
-MC.seurat.sb <- FindVariableFeatures(MC.seurat.sb)
+#MC.seurat.sb <- FindVariableFeatures(MC.seurat.sb)
+
+MC.seurat.sb <- SCTransform(MC.seurat.sb)
 
 MC.seurat.sb <- RunPCA(MC.seurat.sb)
 

@@ -216,32 +216,20 @@ os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.3-arm64/Resou
 
 ```{python}
 for i in range (0,10):
-# the number of clusters
+  # the number of clusters
   n_clusters = 7
-
   dataset = '151673'
-
-# define model
+  # define model
   model = GraphST.GraphST(adata_metaspot, device=device,random_seed=seed_values[i])
-
-# train model
+  # train model
   adata_metaspot = model.train()
-
-# set radius to specify the number of neighbors considered during refinement
+  # set radius to specify the number of neighbors considered during refinement
   radius = 50
-
   tool = 'mclust' # mclust, leiden, and louvain
-
-# clustering
+  # clustering
   from GraphST.utils import clustering
-
-
   print(i)
-  if tool == 'mclust':
-     clustering(adata_metaspot, n_clusters, radius=radius, method=tool, refinement=True) # For DLPFC dataset, we use optional     refinement step.
-  elif tool in ['leiden', 'louvain']:
-    clustering(adata_metaspot, n_clusters, radius=radius, method=tool, start=0.1, end=2.0, increment=0.01, refinement=False)
-  
+  clustering(adata_metaspot, n_clusters, radius=radius, method=tool, refinement=True) # For DLPFC dataset, we use optional     refinement step.
   adata_metaspot.obs['mclust'].to_excel(f"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot/graphST_clustering_metaspot_{i}.xlsx")
 
 #  sc.pl.spatial(adata_metaspot,
@@ -261,8 +249,8 @@ os.environ['R_USER'] = '/Users/admin/miniconda3/lib/python3.10/site-packages/rpy
 adata_metaspot.var_names_make_unique()
 #Normalization
 sc.pp.highly_variable_genes(adata_metaspot, flavor="seurat_v3", n_top_genes=3000)
-sc.pp.normalize_total(adata_metaspot, target_sum=1e4)
-sc.pp.log1p(adata_metaspot)
+sc.pp.normalize_total(adata_metaspot, target_sum=1e4,)
+sc.pp.log1p(adata_metaspot,)
 ```
 
 ```{python}
@@ -270,7 +258,7 @@ import tensorflow.compat.v1 as tf
 for i in range (0,10):
   tf.disable_eager_execution()
 
-  STAGATE.Cal_Spatial_Net(adata_metaspot, rad_cutoff=150)
+  STAGATE.Cal_Spatial_Net(adata_metaspot, rad_cutoff=200)
   STAGATE.Stats_Spatial_Net(adata_metaspot)
 
   adata_metaspot = STAGATE.train_STAGATE(adata_metaspot, alpha=0,random_seed=seed_values[i])

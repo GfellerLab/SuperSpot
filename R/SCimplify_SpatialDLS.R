@@ -128,7 +128,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     print(paste0("Done"))
     print(paste0("Running PCA"))
     so <- RunPCA(so, assay = "SCT",verbose = F)
-    pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
+    pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,n.pc]
   }
 
   print(paste0("Done"))
