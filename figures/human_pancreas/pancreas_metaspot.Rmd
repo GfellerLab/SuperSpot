@@ -161,8 +161,8 @@ MC.seurat <- RunUMAP(MC.seurat, dims = 1:30)
 Idents(MC.seurat) <- "cell_type" 
 levels(MC.seurat) <- sort(levels(MC.seurat))
 
-DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors2)
-DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors2) -> p
+DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors)
+DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors) -> p
 umap_sized.df <- cbind(p[[1]]$data,MC.full.spl$supercell_size)
 colnames(umap_sized.df)[4] <- "superspot_size"
 ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.5)+ 
@@ -201,12 +201,12 @@ MC.seurat.sb <- RunUMAP(MC.seurat.sb, dims = 1:30)
 Idents(MC.seurat.sb) <- "cell_type" 
 levels(MC.seurat.sb) <- sort(levels(MC.seurat.sb))
 
-DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors4)
-DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors4) -> p
+DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors)
+DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors) -> p
 umap_sized.df <- cbind(p[[1]]$data,MC.full.spl$supercell_size[as.numeric(colnames(MC.seurat.sb))])
 colnames(umap_sized.df)[4] <- "superspot_size"
 ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.1)+ 
-     scale_fill_manual(values=distinctive_colors4)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
+     scale_fill_manual(values=distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
                                                          axis.text = element_text(color="black"),
                                                          axis.title = element_text(color="black"),
                                                          legend.text = element_text(color="black"),axis.line.x = element_line(color="black"),
@@ -231,9 +231,10 @@ Idents(nano.obj) <- nano.obj$types
 options(future.globals.maxSize = 8000 * 1024^2)
 
 nano.obj.sb <- subset(nano.obj, features = rownames(nano.obj)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(nano.obj), ignore.case ="True") == FALSE], types != "QC_dropped")
-nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T)
-nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T)
-nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T)
+#nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T)
+#nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T)
+#nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T)
+nano.obj.sb <- SCTransform(nano.obj.sb,assay = "Nanostring")
 nano.obj.sb <- RunPCA(nano.obj.sb, verbose = T)
 nano.obj.sb <- RunUMAP(nano.obj.sb, verbose = T, dims = 1:30)
 levels(nano.obj.sb) <- sort(levels(nano.obj.sb))
@@ -243,8 +244,8 @@ distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', 
                       '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
                       '#712820', '#DCC1DD', '#CCE0F5', '#CCC9E6', '#625D9E', '#68A180', '#3A6963',
                       '#968175')[1:11] 
-DimPlot(nano.obj.sb,cols = distinctive_colors4)+theme(axis.ticks.length=unit(.25, "cm"))+NoLegend()
-DimPlot(nano.obj.sb,cols = distinctive_colors4)+theme(axis.ticks.length=unit(.25, "cm"))
+DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))+NoLegend()
+DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))
 ```
 
 
@@ -313,3 +314,31 @@ ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot",
         text = element_text(size = 20)) +
   RotatedAxis()+NoLegend()
 ```
+
+
+```{r}
+expression_data <- GetAssayData(nano.obj.sb, assay = "Nanostring", slot = "data") %>% as.matrix()
+gene_interest <- "PNLIPRP1"
+# Ensure gene of interest is in the dataset
+# Ensure gene of interest is in the dataset
+if (gene_interest %in% rownames(expression_data)) {
+    gene_data <- expression_data[gene_interest, , drop = FALSE]
+    # Make it a column vector
+    gene_data_matrix <- matrix(gene_data, nrow = length(gene_data), ncol = 1)
+    # Compute correlation
+    #correlations <- cor( expression_data,gene_data_matrix, method = "pearson")
+    correlations <- cor(t(expression_data),t(gene_data), method = "pearson")
+} else {
+    stop("Gene of interest not found in the dataset.")
+}
+
+correlations[gene_interest,] <- 0  # Remove self-correlation
+most_correlated_gene <- rownames(correlations)[which.max(abs(correlations))]
+print(paste("Most correlated gene:", most_correlated_gene))
+print(paste("Correlation coefficient:", correlations[most_correlated_gene,]))
+
+FeatureScatter(nano.obj.sb, feature1 = "PNLIPRP1", 
+    feature2 = most_correlated_gene,)
+plot(expression_data["PNLIPRP1",],expression_data[most_correlated_gene,])
+```
+
