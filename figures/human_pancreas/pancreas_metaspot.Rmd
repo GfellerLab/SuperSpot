@@ -32,7 +32,8 @@ metad$cell_type[is.na(metad$cell_type)] <- "QC_dropped"
 colnames(mtx.flt) <- rownames(metad)
 spotPosition <- GetTissueCoordinates(panc)[,c("x","y")]
 colnames(spotPosition) <- c("imagerow","imagecol")
-
+rm(panc)
+rm(meta)
 distinctive_colors <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
                       '#E95C59', '#E5D2DD', '#AB3282', "#8DA0CB", '#BD956A', '#8C549C', '#585658',
                       '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
@@ -129,6 +130,7 @@ SpatialDimPlotSC(original_coord = spotPosition,
         legend.text = element_text(color="black"))+NoLegend()+coord_fixed()
 
 MC.full.spl$effect.gamma
+rm(MC.spl)
 ```
 
 ```{r}
@@ -145,7 +147,7 @@ MC.seurat <- supercell_2_Seuratv5(
   SC = MC.full.spl, 
   fields = c("cell_type")
 )
-
+rm(MC.ge)
 #MC.seurat <- NormalizeData(MC.seurat)
 
 #MC.seurat <- ScaleData(MC.seurat)
@@ -172,8 +174,8 @@ ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_si
                                                          legend.text = element_text(color="black"),axis.line.x = element_line(color="black"),
                                                          axis.line.y = element_line(color="black"))+NoLegend()
 
-totalElements <- prod(dim(GetAssayData(MC.seurat,layer = "count")))  # Total number of elements in the matrix
-nonZeroElements <- length(GetAssayData(MC.seurat,layer = "count")@x)  # Number of non-zero elements
+totalElements <- prod(dim(GetAssayData(MC.seurat,layer = "count",assay = "RNA")))  # Total number of elements in the matrix
+nonZeroElements <- length(GetAssayData(MC.seurat,layer = "count",assay = "RNA")@x)  # Number of non-zero elements
  
 # Proportion of zeros
 proportionZeros <- (totalElements - nonZeroElements) / totalElements
@@ -185,12 +187,12 @@ proportionZeros
 
 ```{r}
 MC.seurat.sb <- subset(MC.seurat, features = rownames(MC.seurat)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(MC.seurat), ignore.case ="True") == FALSE], cell_type != "QC_dropped")
+rm(MC.seurat)
+MC.seurat.sb <- NormalizeData(MC.seurat.sb,assay = "RNA")
 
-#MC.seurat.sb <- NormalizeData(MC.seurat.sb)
+MC.seurat.sb <- ScaleData(MC.seurat.sb,assay = "RNA")
 
-#MC.seurat.sb <- ScaleData(MC.seurat.sb)
-
-#MC.seurat.sb <- FindVariableFeatures(MC.seurat.sb)
+MC.seurat.sb <- FindVariableFeatures(MC.seurat.sb,assay = "RNA")
 
 MC.seurat.sb <- SCTransform(MC.seurat.sb)
 
@@ -212,6 +214,19 @@ ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_si
                                                          legend.text = element_text(color="black"),axis.line.x = element_line(color="black"),
                                                          axis.line.y = element_line(color="black"))+NoLegend()
 
+
+mc.markers.log <-  FindAllMarkers(MC.seurat.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "RNA" ) %>%filter(p_val_adj < 0.05)
+
+mc.top.markers.log <- mc.markers.log %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+  
+mc.markers.sct <-  FindAllMarkers(MC.seurat.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "SCT" ) %>%filter(p_val_adj < 0.05)
+
+mc.top.markers.sct <- mc.markers.sct %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+
+Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.log$gene,assay = "RNA",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
+Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.sct$gene,assay = "SCT",slot = "data",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
+
+saveRDS(MC.seurat.sb,file = "/Users/admin/Documents/GitHub/SuperSpot/MC_seurat_sb.rds")
 ```
 
 ## Acinar.1
@@ -231,14 +246,15 @@ Idents(nano.obj) <- nano.obj$types
 options(future.globals.maxSize = 8000 * 1024^2)
 
 nano.obj.sb <- subset(nano.obj, features = rownames(nano.obj)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(nano.obj), ignore.case ="True") == FALSE], types != "QC_dropped")
-#nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T)
-#nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T)
-#nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T)
-nano.obj.sb <- SCTransform(nano.obj.sb,assay = "Nanostring")
+rm(nano.obj)
+nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T, assay = "Nanostring")
+nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T,assay = "Nanostring")
+nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T,assay = "Nanostring")
+nano.obj.sb <- SCTransform(nano.obj.sb,assay = "Nanostring",conserve.memory = TRUE)
 nano.obj.sb <- RunPCA(nano.obj.sb, verbose = T)
 nano.obj.sb <- RunUMAP(nano.obj.sb, verbose = T, dims = 1:30)
 levels(nano.obj.sb) <- sort(levels(nano.obj.sb))
-distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
+distinctive_colors <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '#57C3F3', "#FF7F00",
                       '#E95C59', '#E5D2DD', '#AB3282', "#8DA0CB", '#BD956A', '#8C549C', '#585658',
                       '#9FA3A8', '#E0D4CA', '#5F3D69', '#58A4C3', "#b20000", '#E4C755', '#F7F398',
                       '#AA9A59', '#E63863', '#E39A35', '#C1E6F3', '#6778AE', '#91D0BE', '#B53E2B',
@@ -246,6 +262,18 @@ distinctive_colors4 <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', 
                       '#968175')[1:11] 
 DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))+NoLegend()
 DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))
+
+sp.markers.log <-  FindAllMarkers(nano.obj.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "Nanostring" ) %>%filter(p_val_adj < 0.05)
+
+sp.top.markers.log <- sp.markers.log %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+  
+sp.markers.sct <-  FindAllMarkers(nano.obj.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "SCT" ) %>%filter(p_val_adj < 0.05)
+
+sp.top.markers.sct <- sp.markers.sct %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
+Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.log$gene,assay = "Nanostring",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
+Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.sct$gene,assay = "SCT",slot = "data",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
+
+saveRDS(nano.obj.sb,file = "/Users/admin/Documents/GitHub/SuperSpot/nano_obj_sb.rds")
 ```
 
 
@@ -340,5 +368,92 @@ print(paste("Correlation coefficient:", correlations[most_correlated_gene,]))
 FeatureScatter(nano.obj.sb, feature1 = "PNLIPRP1", 
     feature2 = most_correlated_gene,)
 plot(expression_data["PNLIPRP1",],expression_data[most_correlated_gene,])
+```
+
+```{r}
+benchmark.results <- read_csv("/Users/admin/Documents/GitHub/SuperSpot/figures/human_pancreas/benchmarking/results_memory.csv")
+benchmark.results$Peak_RAM_Used_Go <- (benchmark.results$Peak_RAM_Used_MiB)/953.7
+plot(1:25,benchmark.results$Peak_RAM_Used_Go,type = "b")
+plot(1:25,benchmark.results$Elapsed_Time_sec,type = "b")
+```
+
+```{r}
+nano.obj.sb@meta.data$project <- rep("global",nrow(nano.obj.sb@meta.data))
+VlnPlot(nano.obj.sb,features = "nFeature_Nanostring",group.by = "project")[[1]][["data"]] -> v1
+MC.seurat.sb@meta.data$project <- rep("global",nrow(MC.seurat.sb@meta.data))
+VlnPlot(MC.seurat.sb,features = "nFeature_RNA",group.by = "project")[[1]][["data"]] -> v2
+colnames(v1)[1] <- "nFeatures"
+colnames(v2)[1] <- "nFeatures"
+vln.final <- rbind(v1,v2)
+vln.final$condition <- c(rep("spot",nrow(v1)),rep("metaspot",nrow(v2)))
+ggplot(vln.final%>% dplyr::mutate(condition = factor(condition, levels = c("spot","metaspot"))),aes(x = condition, y = nFeatures, fill = condition)) + geom_violin() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20),legend.position="top") +
+  RotatedAxis()
+```
+
+```{r}
+nano.obj.sb@meta.data$annotation <- paste0(nano.obj.sb@meta.data$types,"_spot")
+MC.seurat.sb@meta.data$annotation <- paste0(MC.seurat.sb@meta.data$cell_type,"_metaspot")
+nano.obj.sb@assays$RNA <- nano.obj.sb@assays$Nanostring
+DefaultAssay(nano.obj.sb) <- "RNA"
+nano.obj.sb[["Nanostring"]] <- NULL
+merged.so <- merge(nano.obj.sb,y = MC.seurat.sb,merge.data = TRUE)
+DefaultAssay(merged.so) <- "RNA"
+merged.so[["Nanostring"]] <- NULL
+merged.so <- JoinLayers(object = merged.so)
+Idents(merged.so) <- merged.so$annotation
+
+saveRDS(merged.so,file = "/Users/admin/Documents/GitHub/SuperSpot/merged_so.rds")
+Seurat::DoHeatmap(merged.so,sp.top.markers.log$gene,assay = "RNA",group.by = "annotation")+ scale_fill_gradientn(colors = c("white", "grey", "red"))+NoLegend()
+
+cells_to_plot <- WhichCells(merged.so,idents = c("Acinar.1_spot","Acinar.1_metaspot","Acinar.2_spot","Acinar.2_metaspot","Ductal_spot","Ductal_metaspot"))
+Seurat::DoHeatmap(merged.so,subset(sp.top.markers.log,cluster %in% c("Acinar.1","Acinar.2","Ductal"))$gene,assay = "RNA",group.by = "annotation",cells = cells_to_plot,slot = "data")+ scale_fill_gradientn(colors = c("grey", "red"))+NoLegend()
+```
+
+```{r}
+Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.log$gene,assay = "Nanostring",group.colors = distinctive_colors[1:11],group.by = "types")[[1]][["data"]]-> h1
+Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.log$gene,assay = "RNA",group.colors = distinctive_colors[1:11],group.by = "cell_type")[[1]][["data"]] -> h2
+h1$Identity <- paste0(h1$Identity,"_spot")
+h2$Identity <- paste0(h2$Identity,"_metaspot")
+heat.df <- rbind(h1,h2)
+ggplot(heat.df, aes(Fea))
+```
+
+```{r}
+merged.so.sb <- subset(merged.so, idents = c("Acinar.1_spot","Acinar.2_spot","Ductal_spot","Acinar.1_metaspot","Acinar.2_metaspot","Ductal_metaspot"))
+levels(merged.so.sb) <- c("Acinar.1_spot","Acinar.2_spot","Ductal_spot","Acinar.1_metaspot","Acinar.2_metaspot","Ductal_metaspot")
+Seurat::DoHeatmap(merged.so.sb,subset(sp.top.markers.log,cluster %in% c("Acinar.1","Acinar.2","Ductal"))$gene,assay = "RNA",cells = cells_to_plot,slot = "data",group.colors = c("#E59CC4", "#53A85F", "#FF7F00",'#E59CC4', '#53A85F', "#FF7F00"))+ scale_fill_gradientn(colors = c("lightgrey", "red"))+NoLegend()
+```
+
+```{r}
+a1_v_a2 <- FindMarkers(merged.so.sb,ident.1 = "Acinar.1_spot",ident.2 = "Acinar.2_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+a1_v_d <- FindMarkers(merged.so.sb,ident.1 = "Acinar.1_spot",ident.2 = "Ductal_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+a1_genes <- intersect(rownames(a1_v_a2),rownames(a1_v_d))
+
+a1_df <- tibble(genes = a1_genes, a2_logFC = a1_v_a2[a1_genes,"avg_log2FC"], d_logFC = a1_v_d[a1_genes,"avg_log2FC"])
+a1_df$avg_logFC <- rowMeans(a1_df[,2:3])
+a1_df <- a1_df[order(a1_df$avg_logFC, decreasing = TRUE),]
+a1_df$genes[1:5]
+
+a2_v_a1 <- FindMarkers(merged.so.sb,ident.1 = "Acinar.2_spot",ident.2 = "Acinar.1_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+a2_v_d <- FindMarkers(merged.so.sb,ident.1 = "Acinar.2_spot",ident.2 = "Ductal_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+a2_genes <- intersect(rownames(a2_v_a1),rownames(a2_v_d))
+
+a2_df <- tibble(genes = a2_genes, a1_logFC = a2_v_a1[a2_genes,"avg_log2FC"], d_logFC = a2_v_d[a2_genes,"avg_log2FC"])
+a2_df$avg_logFC <- rowMeans(a2_df[,2:3])
+a2_df <- a2_df[order(a2_df$avg_logFC, decreasing = TRUE),]
+a2_df$genes[1:5]
+
+d_v_a1 <- FindMarkers(merged.so.sb,ident.1 = "Ductal_spot",ident.2 = "Acinar.1_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+d_v_a2 <- FindMarkers(merged.so.sb,ident.1 = "Ductal_spot",ident.2 = "Acinar.2_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
+d_genes <- intersect(rownames(d_v_a1),rownames(d_v_a2))
+
+d_df <- tibble(genes = d_genes, a1_logFC = d_v_a1[d_genes,"avg_log2FC"], a2_logFC = d_v_a2[d_genes,"avg_log2FC"])
+d_df$avg_logFC <- rowMeans(d_df[,2:3])
+d_df <- d_df[order(d_df$avg_logFC, decreasing = TRUE),]
+d_df$genes[1:5]
 ```
 

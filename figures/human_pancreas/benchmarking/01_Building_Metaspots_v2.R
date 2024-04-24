@@ -23,7 +23,7 @@ colnames(spotPosition) <- c("imagerow","imagecol")
 effective.gammas <- c()
 
 for (g in 1:25){
-  n.pc = 30 # number of first PC to use
+  n.pc = 1:30 # number of first PC to use
   k.knn = 16 # number of neighbors to connect to each spot
   MC <- SCimplify_SpatialDLS(X = mtx.flt,
                                  spotPositions = spotPosition ,
@@ -34,7 +34,7 @@ for (g in 1:25){
                                  n.pc = n.pc,
                                  method_knn = "1",
                                  k.knn = k.knn,
-                                 method_normalization = "log_normalize",
+                                 method_normalization = "SCT",
                                  #cell.annotation = metad$cell_type,
                                  return.seurat.object = FALSE)
   metad[,str_c("MC_membership_",g)] <- MC$membership %>% as.character()
@@ -98,5 +98,5 @@ for (g in 1:25){
   #saveRDS(MC.fs.seurat,file = paste0("/Volumes/Analyses/Thèse/2023/data/MC.fs.seurat_g",g,".rds"))
 }
 
-write.csv(tibble(effective_gammas = effective.gammas),"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/effective_gammas.csv")
+write.csv(tibble(input_gamma = paste(1:25),effective_gammas = effective.gammas),"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/effective_gammas.csv")
 write.csv(metad,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/metad.csv")

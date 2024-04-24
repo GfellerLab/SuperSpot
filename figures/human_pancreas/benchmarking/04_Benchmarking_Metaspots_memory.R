@@ -15,7 +15,7 @@ processing <- function(g){
   #starting_times <- c(starting_times,start_time)
   so <- readRDS(paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/MC.seurat_g",g,".rds"))
   #so <- readRDS(paste0("/Volumes/Analyses/Thèse/2023/data/MC.fs.seurat_g",g,".rds"))
-  so <- NormalizeData(so)
+  #so <- NormalizeData(so)
   # MC.seurat <- SetAssayData(
   #     object = MC.seurat,
   #     layer = "data",
@@ -23,10 +23,10 @@ processing <- function(g){
   #     assay = "RNA"
   # )
 
-  so <- ScaleData(so)
+  #so <- ScaleData(so)
 
-  so <- FindVariableFeatures(so)
-
+  #so <- FindVariableFeatures(so)
+  so <- SCTransform(so)
   so <- RunPCA(so)
 
   so <- RunUMAP(so, dims = 1:30)

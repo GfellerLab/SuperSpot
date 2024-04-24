@@ -35,7 +35,8 @@ annotation_list$bayesspace_clustering <- bayespace_results_spots
 ```
 
 ```{r}
-ari_matrix <- matrix(nrow = 6, ncol = 6)
+ari_matrix_mean <- matrix(nrow = 6, ncol = 6)
+ari_matrix_max <- matrix(nrow = 6, ncol = 6)
 for (i in 1:6){
   for (j in 1:6){
     print(i)
@@ -70,13 +71,15 @@ for (i in 1:6){
         aris <- c(aris,ari_tmp)
       }
     }
-    ari_matrix[i,j] <- mean(aris)
+    ari_matrix_mean[i,j] <- mean(aris)
+    ari_matrix_max[i,j] <- max(aris)
   }}    
     
 ```
 
 ```{r}
-ari_matrix
+ari_matrix_mean
+ari_matrix_max
 ```
 
 
@@ -188,6 +191,7 @@ for (c in 1:10){
   aris <- c(aris,ari_tmp)
 }
 bayespace_ari_mean <- mean(aris)
+bayespace_ari_max <- max(aris)
 
 aris <- c()
 for (c1 in 1:10){
@@ -202,6 +206,7 @@ for (c1 in 1:10){
   }
 }
 bayespace_ari_mean_ms_vs_s <- mean(aris)
+bayespace_ari_max_ms_vs_s <- max(aris)
 ```
 
 ```{r}
@@ -216,6 +221,7 @@ for (c in 1:10){
   aris <- c(aris,ari_tmp)
 }
 cellcharter_ari_mean <- mean(aris)
+cellcharter_ari_max <- max(aris)
 
 aris <- c()
 for (c1 in 1:10){
@@ -230,6 +236,7 @@ for (c1 in 1:10){
   }
 }
 cellcharter_ari_mean_ms_vs_s <- mean(aris)
+cellcharter_ari_max_ms_vs_s <- max(aris)
 ```
 
 ```{r}
@@ -244,6 +251,7 @@ for (c in 1:10){
   aris <- c(aris,ari_tmp)
 }
 dr.sc_ari_mean <- mean(aris)
+dr.sc_ari_max <- max(aris)
 
 aris <- c()
 for (c1 in 1:10){
@@ -258,6 +266,7 @@ for (c1 in 1:10){
   }
 }
 dr.sc_ari_mean_ms_vs_s <- mean(aris)
+dr.sc_ari_max_ms_vs_s <- max(aris)
 ```
 
 ```{r}
@@ -272,6 +281,7 @@ for (c in 1:10){
   aris <- c(aris,ari_tmp)
 }
 graphst_ari_mean <- mean(aris)
+graphst_ari_max <- max(aris)
 
 aris <- c()
 for (c1 in 1:10){
@@ -286,6 +296,7 @@ for (c1 in 1:10){
   }
 }
 graphst_ari_mean_ms_vs_s <- mean(aris)
+graphst_ari_max_ms_vs_s <- max(aris)
 ```
 
 ```{r}
@@ -300,6 +311,7 @@ for (c in 1:10){
   aris <- c(aris,ari_tmp)
 }
 STAGATE_ari_mean <- mean(aris)
+STAGATE_ari_max <- max(aris)
 
 aris <- c()
 for (c1 in 1:10){
@@ -314,26 +326,78 @@ for (c1 in 1:10){
   }
 }
 STAGATE_ari_mean_ms_vs_s <- mean(aris)
+STAGATE_ari_max_ms_vs_s <- max(aris)
 ```
 
 ##
 
 ```{r}
-bplot1 <- tibble(ARI = c(ari_matrix[1,2],graphst_ari_mean,
-                         ari_matrix[1,3],STAGATE_ari_mean,
-                         ari_matrix[1,4],cellcharter_ari_mean,
-                         ari_matrix[1,5],dr.sc_ari_mean,
-                         ari_matrix[1,6],bayespace_ari_mean),
+bplot1 <- tibble(ARI = c(ari_matrix_mean[1,2],graphst_ari_mean,
+                         ari_matrix_mean[1,3],STAGATE_ari_mean,
+                         ari_matrix_mean[1,4],cellcharter_ari_mean,
+                         ari_matrix_mean[1,5],dr.sc_ari_mean,
+                         ari_matrix_mean[1,6],bayespace_ari_mean),
                  Algorithm = c(rep("GraphST",2),rep("STAGATE",2),rep("CellCharter",2),rep("DR.SC",2),rep("BayesSpace",2)), Condition = c("spot", "metaspot","spot", "metaspot", "spot", "metaspot", "spot", "metaspot", "spot", "metaspot"))
 bplot1_v2 <- bplot1 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")))
 ggplot(bplot1_v2, aes(x = Algorithm, y = ARI, fill = Condition, colour = Condition))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20),legend.position="top")+RotatedAxis()
 
 
-bplot3 <- tibble(ARI = c(graphst_ari_mean_ms_vs_s,ari_matrix[2,c(3:6)],
-                         STAGATE_ari_mean_ms_vs_s,ari_matrix[3,c(2,4:6)],
-                         cellcharter_ari_mean_ms_vs_s,ari_matrix[4,c(2,3,5,6)],
-                         dr.sc_ari_mean_ms_vs_s,ari_matrix[5,c(2:4,6)],
-                         bayespace_ari_mean_ms_vs_s,ari_matrix[6,c(2:5)]), 
+bplot3 <- tibble(ARI = c(graphst_ari_mean_ms_vs_s,ari_matrix_mean[2,c(3:6)],
+                         STAGATE_ari_mean_ms_vs_s,ari_matrix_mean[3,c(2,4:6)],
+                         cellcharter_ari_mean_ms_vs_s,ari_matrix_mean[4,c(2,3,5,6)],
+                         dr.sc_ari_mean_ms_vs_s,ari_matrix_mean[5,c(2:4,6)],
+                         bayespace_ari_mean_ms_vs_s,ari_matrix_mean[6,c(2:5)]), 
+                 Algorithm = c(rep("GraphST",5),
+                               rep("STAGATE",5),
+                               rep("CellCharter",5),
+                               rep("DR.SC",5),
+                               rep("BayesSpace",5)),
+                 Condition = rep(c("metaspot",rep("spot",4)),5),
+                 Against = c("GraphST","STAGATE","CellCharter","DR.SC","BayesSpace",
+                             "STAGATE","GraphST","CellCharter","DR.SC","BayesSpace",
+                             "CellCharter","GraphST","STAGATE","DR.SC","BayesSpace",
+                             "DR.SC","GraphST","STAGATE","CellCharter","BayesSpace",
+                             "BayesSpace","GraphST","STAGATE","CellCharter","DR.SC"))
+ggplot(bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))), aes(x = Algorithm, y = ARI,))+
+  geom_boxplot(data = subset(bplot3, Condition == "spot"),mapping = aes(x = Algorithm, y = ARI,))+
+  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1, aes( fill = Condition),
+               #position=position_dodge(0.1)
+               ) +
+  scale_fill_manual(values = c("metaspot" = "#00BFC4", "spot" = "black")) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20),legend.position="top") +
+  RotatedAxis()
+
+
+ggplot() +
+    geom_boxplot(data = subset(bplot3, Condition == "spot"), aes(x = Algorithm, y = ARI),outlier.size=0) +
+    geom_point(data = bplot3 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),position = position_jitterdodge(jitter.width = 0, dodge.width = 0), size = 5,mapping = aes(x = Algorithm, y = ARI,shape = Against, color = Condition))+
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          text = element_text(size = 20),
+          legend.position = "top")+
+    RotatedAxis()
+```
+
+```{r}
+bplot1 <- tibble(ARI = c(ari_matrix_max[1,2],graphst_ari_max,
+                         ari_matrix_max[1,3],STAGATE_ari_max,
+                         ari_matrix_max[1,4],cellcharter_ari_max,
+                         ari_matrix_max[1,5],dr.sc_ari_max,
+                         ari_matrix_max[1,6],bayespace_ari_max),
+                 Algorithm = c(rep("GraphST",2),rep("STAGATE",2),rep("CellCharter",2),rep("DR.SC",2),rep("BayesSpace",2)), Condition = c("spot", "metaspot","spot", "metaspot", "spot", "metaspot", "spot", "metaspot", "spot", "metaspot"))
+bplot1_v2 <- bplot1 %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")))
+ggplot(bplot1_v2, aes(x = Algorithm, y = ARI, fill = Condition, colour = Condition))+geom_bar(stat = "identity", position = "dodge")+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 20),legend.position="top")+RotatedAxis()
+
+
+bplot3 <- tibble(ARI = c(graphst_ari_max_ms_vs_s,ari_matrix_max[2,c(3:6)],
+                         STAGATE_ari_max_ms_vs_s,ari_matrix_max[3,c(2,4:6)],
+                         cellcharter_ari_max_ms_vs_s,ari_matrix_max[4,c(2,3,5,6)],
+                         dr.sc_ari_max_ms_vs_s,ari_matrix_max[5,c(2:4,6)],
+                         bayespace_ari_max_ms_vs_s,ari_matrix_max[6,c(2:5)]), 
                  Algorithm = c(rep("GraphST",5),
                                rep("STAGATE",5),
                                rep("CellCharter",5),

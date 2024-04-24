@@ -30,7 +30,7 @@ RUN R -e "if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages
 
 # For GitHub packages, you can use remotes to install them. Example:
 RUN R -e "if (!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools'); devtools::install_github('GfellerLab/SuperCell')"
-RUN R -e "if (!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools'); devtools::install_github('GfellerLab/SuperSpot',ref='main', auth_token = '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')"
+RUN R -e "if (!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools'); devtools::install_github('GfellerLab/SuperSpot')"
 RUN R -e "if (!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools'); devtools::install_github('immunogenomics/presto')"
 
 # For velocyto.R, which is not directly available via install.packages() or BiocManager::install()

@@ -5,15 +5,6 @@ date: "2024-04-15"
 output: html_document
 ---
 ## Creating Metaspots
-
-```{r}
-dlpfc151673 <- Load10X_Spatial("/Users/admin/Downloads/151673")
-metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
-dlpfc151673@meta.data$layer_guess <- metadata_151673$layer_guess
-SpatialDimPlot(dlpfc151673,group.by = "layer_guess")
-```
-
-
 ```{r}
 library(igraph)
 library(pbapply)
@@ -33,6 +24,11 @@ library(networkD3)
 library(ggforce)
 library(clusterProfiler)
 library(SuperSpot)
+dlpfc151673 <- Load10X_Spatial("/Users/admin/Downloads/151673")
+metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
+dlpfc151673@meta.data$layer_guess <- metadata_151673$layer_guess
+SpatialDimPlot(dlpfc151673,group.by = "layer_guess")
+
 #mtx <- dlpfc151673@assays$Spatial@layers$counts# %>% as.data.frame()
 mtx <- GetAssayData(dlpfc151673,assay = "Spatial",slot = "counts")
 
@@ -41,7 +37,7 @@ spotPositions <- GetTissueCoordinates(dlpfc151673)
 dlpfc151673 <- FindVariableFeatures(dlpfc151673,nfeatures = 2000)
 hvg <- VariableFeatures(dlpfc151673)
 
-MC_DLS.spl <- SCimplify_SpatialDLS(X = mtx,spotPositions = spotPositions,method_similarity = "1", genes.use = hvg,gamma = 5 , n.pc = 3:30,method_knn = "1",k.knn = 6 , cell.annotation = dlpfc151673@meta.data$layer_guess , method_normalization = "log_normalize",split_not_connected = T)
+MC_DLS.spl <- SCimplify_SpatialDLS(X = mtx,spotPositions = spotPositions,method_similarity = "1", genes.use = hvg,gamma = 5 , n.pc = 1:30,method_knn = "1",k.knn = 6 , cell.annotation = dlpfc151673@meta.data$layer_guess , method_normalization = "log_normalize",split_not_connected = T)
 
 dlpfc151673@meta.data$MC_membership_spl <- MC_DLS.spl$membership %>% as.character()
 
@@ -243,6 +239,25 @@ for i in range (0,10):
 
 #### STAGATE
 ```{python}
+adata_metaspot = sc.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspots_counts.csv")
+adata_metaspot.var_names_make_unique()
+
+metaspot_position = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspots_positions.csv")
+
+# Load the spatial coordinates
+spatial_coords = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot_tissue_positions_list.csv", header=None, index_col=0)
+
+# Assuming 'adata_metaspot' is your AnnData object with the count matrix
+# Make sure that the index of spatial_coords matches the order of the barcodes in adata_metaspot.obs_names
+#adata_metaspot.obsm['spatial'] = spatial_coords.loc[adata_metaspot.obs_names, [4, 5]].to_numpy()
+adata_metaspot.obsm['spatial'] = spatial_coords.loc[:, [4, 5]].to_numpy()
+
+# Add additional metadata_metaspot, if any, such as the image path
+adata_metaspot.uns['spatial'] = {'images': '/Users/admin/Downloads/151673/spatial/tissue_lowres_image.png'}
+```
+
+
+```{python}
 os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.3-arm64/Resources"
 os.environ['R_USER'] = '/Users/admin/miniconda3/lib/python3.10/site-packages/rpy2'
 #adata_metaspot = sc.read_visium(path="/Users/admin/Downloads/151673", count_file='filtered_feature_bc_matrix.h5')
@@ -258,7 +273,7 @@ import tensorflow.compat.v1 as tf
 for i in range (0,10):
   tf.disable_eager_execution()
 
-  STAGATE.Cal_Spatial_Net(adata_metaspot, rad_cutoff=200)
+  STAGATE.Cal_Spatial_Net(adata_metaspot, rad_cutoff=400)
   STAGATE.Stats_Spatial_Net(adata_metaspot)
 
   adata_metaspot = STAGATE.train_STAGATE(adata_metaspot, alpha=0,random_seed=seed_values[i])
@@ -505,3 +520,7 @@ writexl::write_xlsx(x = as.data.frame(colData(insh)[,"spatial.cluster",drop = F]
 }
 
 ```
+```{r}
+saveRDS(dlpfc151673,"/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/cortex_with_membership.rds")
+```
+
