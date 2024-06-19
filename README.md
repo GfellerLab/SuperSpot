@@ -24,7 +24,7 @@ remotes::install_github("GfellerLab/SuperSpot")
 ```
 
 ## Example
-An example vignette is available (see [example](./example.html)).
+An example vignette is available (see [example](./example.md)).
 
 ## License
 SuperSpot can be used freely by academic groups for non-commercial purposes.
