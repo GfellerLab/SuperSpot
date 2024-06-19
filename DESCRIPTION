@@ -53,8 +53,7 @@ Suggests:
     pliman,
     rmarkdown,
     remotes,
-    velocyto.R,
-    testthat (>= 3.0.0)
+    velocyto.R
 Depends: 
     R (>= 4.3.1)
 VignetteBuilder: knitr
