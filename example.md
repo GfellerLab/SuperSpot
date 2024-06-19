@@ -4,18 +4,16 @@
 
     ## Loading required package: SeuratObject
 
-    ## Loading required package: sp
+    ## Warning: package 'SeuratObject' was built under R version 4.3.3
 
-    ## 'SeuratObject' was built with package 'Matrix' 1.6.3 but the current
-    ## version is 1.6.5; it is recomended that you reinstall 'SeuratObject' as
-    ## the ABI for 'Matrix' may have changed
+    ## Loading required package: sp
 
     ## 
     ## Attaching package: 'SeuratObject'
 
-    ## The following object is masked from 'package:base':
+    ## The following objects are masked from 'package:base':
     ## 
-    ##     intersect
+    ##     intersect, t
 
     library(SuperSpot)
     library(SuperCell)
@@ -25,7 +23,7 @@
     ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
     ## ✔ dplyr     1.1.4     ✔ purrr     1.0.2
     ## ✔ forcats   1.0.0     ✔ readr     2.1.5
-    ## ✔ ggplot2   3.4.4     ✔ stringr   1.5.1
+    ## ✔ ggplot2   3.5.1     ✔ stringr   1.5.1
     ## ✔ lubridate 1.9.3     ✔ tibble    3.2.1
 
     ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
@@ -165,13 +163,14 @@ each cell type/region). The main output here is the membership given to
 each spot to know in which metaspot it is assigned.
 
     g = 10 # gamma
-    n.pc = 5 # number of first PC to use
+    n.pc = 1:5 # number of first PC to use
     k.knn = 16 # number of neighbors to connect to each spot
 
     print("Creating metaspots")
 
     ## [1] "Creating metaspots"
 
+    # By default, SCimplify_SpatialDLS computes distances in a parallalized way. By default, all the available cpus are used. If your computer doesn't support, you can change the number of cpus with the paramater "n.cpu"
     MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,
                                          spotPositions = spotPosition ,
                                          method_similarity = "1",
@@ -182,12 +181,12 @@ each spot to know in which metaspot it is assigned.
                                          method_knn = "1",
                                          k.knn = k.knn,
                                          method_normalization = "log_normalize",
-                                         cell.annotation = well7.md$Main_molecular_cell_type,)
+                                         cell.annotation = well7.md$Main_molecular_cell_type)
 
     ## [1] "Building KNN graph with nn2"
-    ## [1] "Neighbors with distance > 173.209634230687 are removed"
+    ## [1] "Neighbors with distance > 189.761884073383 are removed"
 
-    ## [1] "Maximum gamma is 79.181338028169"
+    ## [1] "Maximum gamma is 138.384615384615"
     ## [1] "Done"
 
     ## Warning: Data is of class data.frame. Coercing to dgCMatrix.
@@ -303,11 +302,16 @@ them again based on if they are still connected or not in the KNN.
 
 ## Create Seurat object from metaspot object
 
+As normalization is a matter of debate for spatial transcriptomics data,
+we use here Log Normalization. But SuperSpot offers also using SCT and
+using raw counts.
+
     MC_centroids <- supercell_spatial_centroids(MC.well7_DLS.spl,spotPositions = spotPosition)
 
     MC.ge <- superspot_GE(MC = MC.well7_DLS.spl,
       ge = well7.mtx %>% as.matrix(),
-      groups = as.numeric(MC.well7_DLS.spl$membership)
+      groups = as.numeric(MC.well7_DLS.spl$membership),
+      mode = "sum"
     )
 
     MC.seurat <- supercell_2_Seuratv5(
@@ -333,40 +337,40 @@ them again based on if they are still connected or not in the KNN.
     MC.seurat <- RunPCA(MC.seurat)
 
     ## PC_ 1 
-    ## Positive:  PLTP, SELPLG, MBP, VTN, ABCC9, SPARC, VIM, CSF1R, P2RY12, GPR34 
-    ##     LEF1, LY6C1, TEK, RGS5, CTSS, APOD, LY6A, FN1, CLDN5, SLC7A10 
-    ##     PGLYRP1, GFAP, VWF, FLT1, CST3, ZIC1, C1QB, MFSD2A, TREM2, S1PR1 
-    ## Negative:  CPNE6, GRM7, GRM5, CACNA2D1, SEZ6, PGR, CHRM1, IGSF8, OPRL1, RESP18 
-    ##     GPRASP2, ATP2B4, PRKCG, STMN2, SLC24A2, SPHKAP, GABBR2, C1QL3, NEUROD6, PTPN3 
-    ##     LTK, KCND3, KCNG1, PPP2R2B, NPTX1, LRPPRC, NEUROD2, CCK, CADM1, SUMO2 
+    ## Positive:  PLTP, SELPLG, MBP, VTN, ABCC9, SPARC, CSF1R, P2RY12, GPR34, VIM 
+    ##     LEF1, LY6C1, TEK, CTSS, RGS5, LY6A, FN1, APOD, CLDN5, SLC7A10 
+    ##     FLT1, VWF, PGLYRP1, ZIC1, GFAP, C1QB, CST3, TREM2, VCAN, MYH11 
+    ## Negative:  CPNE6, GRM7, GRM5, CACNA2D1, CHRM1, SEZ6, IGSF8, PGR, OPRL1, ATP2B4 
+    ##     RESP18, PRKCG, GPRASP2, SLC24A2, SPHKAP, GABBR2, STMN2, C1QL3, LTK, KCNG1 
+    ##     PTPN3, NEUROD2, NPTX1, LRPPRC, NEUROD6, KCND3, PPP2R2B, CCK, CADM1, EPHA7 
     ## PC_ 2 
     ## Positive:  TRF, APOD, CLDN11, MAL, HAPLN2, PPP1R14A, TMEM88B, MOG, UGT8A, CAR2 
-    ##     MBP, OPALIN, PTGDS, KLK6, ANLN, PRR5L, PLIN3, GJB1, SERPINB1A, PROX1 
-    ##     SPARC, EFHD1, CCP110, TBX20, ST18, CD9, DOCK5, UNC5B, HHIP, SLC6A5 
-    ## Negative:  NRGN, SLC17A7, CHRM1, CCK, ADCY1, PRKCG, GRM5, CPNE6, C1QL3, NPTX1 
-    ##     HPCAL4, NECAB1, TBR1, RGS4, CACNA2D1, NEUROD6, TIAM1, NEUROD2, PDE1A, SLC30A3 
-    ##     ATP2B4, DBPHT2, KCNG1, SPHKAP, SEZ6, CRYM, NPY1R, LAMP5, MCHR1, DKK3 
+    ##     MBP, OPALIN, PTGDS, KLK6, ANLN, PRR5L, GJB1, PLIN3, SERPINB1A, SPARC 
+    ##     PROX1, EFHD1, CCP110, TBX20, CD9, ST18, UNC5B, DOCK5, HHIP, SLC6A5 
+    ## Negative:  NRGN, SLC17A7, CHRM1, CCK, ADCY1, GRM5, C1QL3, PRKCG, CPNE6, NPTX1 
+    ##     NECAB1, HPCAL4, TBR1, RGS4, NEUROD6, CACNA2D1, TIAM1, SLC30A3, NEUROD2, DBPHT2 
+    ##     ATP2B4, PDE1A, KCNG1, SPHKAP, NPY1R, SEZ6, CRYM, LAMP5, MCHR1, DKK3 
     ## PC_ 3 
-    ## Positive:  VIM, MFGE8, GFAP, SLC1A3, PLTP, VTN, DCN, MGP, GJB2, IGF2 
-    ##     S1PR1, MYOC, LHX2, FN1, TBX18, SLC6A13, MYH11, VWF, HOPX, NR2F2 
-    ##     FJX1, SLC17A7, COL3A1, GRIN2C, GLDC, FAM107A, AQP4, HTRA1, HPCAL4, CST3 
-    ## Negative:  VAMP1, GLRA1, RESP18, SYT2, GPRASP2, SLC32A1, GAD1, GAD2, MBP, NEFM 
-    ##     CACNA2D2, KCNC3, HTR2C, KCNC2, CORO6, SLC24A2, OPRL1, STMN2, PVALB, SLC17A6 
-    ##     RGS8, PLCXD2, SV2C, GATA3, NEFH, MRAP2, BAIAP3, GNG4, LGI2, HAP1 
+    ## Positive:  VAMP1, GLRA1, RESP18, GPRASP2, SYT2, SLC32A1, GAD1, GAD2, MBP, NEFM 
+    ##     CACNA2D2, KCNC3, HTR2C, KCNC2, CORO6, SLC24A2, OPRL1, STMN2, PVALB, PLCXD2 
+    ##     SLC17A6, RGS8, NEFH, SV2C, GATA3, MRAP2, GNG4, BAIAP3, LGI2, HAP1 
+    ## Negative:  VIM, GFAP, MFGE8, PLTP, VTN, SLC1A3, DCN, MGP, GJB2, IGF2 
+    ##     MYOC, FN1, S1PR1, LHX2, TBX18, SLC6A13, VWF, MYH11, NR2F2, COL3A1 
+    ##     HOPX, SLC17A7, GRIN2C, FJX1, GLDC, LY6A, OSR1, FAM107A, SLC13A3, C4B 
     ## PC_ 4 
-    ## Positive:  HTRA1, SLC6A11, FGFR3, S1PR1, CLU, SLC1A3, MFGE8, AQP4, TTYH1, PTPRZ1 
-    ##     MLC1, NTSR2, GJA1, CBS, ADCYAP1R1, FJX1, SLC7A10, FAM107A, CXCL14, CLDN10 
-    ##     AGT, CST3, ID4, FAM181B, NDRG2, ADA, CSPG5, TIMP4, GLDC, GRIN2C 
-    ## Negative:  APOD, HAPLN2, TRF, CLDN11, PPP1R14A, MAL, KLK6, ANLN, UGT8A, MGP 
-    ##     GJB1, VTN, PTGDS, IGF2, PRR5L, OPALIN, PDLIM1, SERPINB1A, MOG, TBX20 
-    ##     TBX18, DCN, TMEM88B, UNC5B, TMSB4X, PTPRK, TMEM215, CCP110, DOCK5, DPY19L1 
+    ## Positive:  APOD, TRF, HAPLN2, CLDN11, PPP1R14A, MGP, IGF2, VTN, MAL, KLK6 
+    ##     ANLN, PTGDS, TBX18, UGT8A, PDLIM1, GJB1, DCN, PRR5L, OPALIN, SERPINB1A 
+    ##     TBX20, COL3A1, FN1, TMEM215, MOG, PTPRK, NTF3, UNC5B, SLC6A13, GPR101 
+    ## Negative:  HTRA1, FGFR3, SLC6A11, S1PR1, SLC1A3, CLU, MFGE8, AQP4, TTYH1, PTPRZ1 
+    ##     MLC1, NTSR2, GJA1, CBS, FJX1, SLC7A10, FAM107A, ADCYAP1R1, CXCL14, CLDN10 
+    ##     CST3, AGT, ID4, FAM181B, NDRG2, CSPG5, ADA, GLDC, TIMP4, GRIN2C 
     ## PC_ 5 
-    ## Positive:  SLC17A7, HAPLN2, CLDN11, MOG, CAR2, OPALIN, HPCAL4, TRF, NRGN, UGT8A 
-    ##     TMEM88B, GJB1, ANLN, SERPINB1A, C1QL3, PRKCG, TBR1, PPP1R14A, DPY19L1, CRYM 
-    ##     CHRM1, CCP110, TCF4, CCK, NEUROD6, FEZF2, PRR5L, MAL, PROX1, ADCY1 
-    ## Negative:  IGF2, VTN, MGP, GJB2, TBX18, SLC6A13, MYH11, GLRA1, ZIC1, PLTP 
-    ##     SERPINF1, SYT2, VIM, ISLR, SPP1, COL3A1, FN1, VWF, VAMP1, TAGLN 
-    ##     SPARC, FBLN5, A2M, CSRP2, SLC47A1, SLC13A3, MYOC, COL18A1, IGFBP4, ASS1
+    ## Positive:  HAPLN2, SLC17A7, CLDN11, MOG, OPALIN, TRF, UGT8A, CAR2, HPCAL4, ANLN 
+    ##     NRGN, TMEM88B, GJB1, SERPINB1A, PPP1R14A, C1QL3, DPY19L1, TBR1, PRKCG, CCP110 
+    ##     CHRM1, CRYM, NEUROD6, CCK, PRR5L, MAL, TCF4, FEZF2, PROX1, TBX20 
+    ## Negative:  IGF2, VTN, MGP, GJB2, GLRA1, TBX18, SLC6A13, MYH11, SYT2, ZIC1 
+    ##     SERPINF1, ISLR, PLTP, VIM, SPP1, COL3A1, VAMP1, SPARC, FBLN5, VWF 
+    ##     FN1, A2M, TAGLN, SLC47A1, SLC13A3, CSRP2, MYOC, ASS1, CACNA2D2, EGLN3
 
     MC.seurat <- RunUMAP(MC.seurat, dims = 1:30)
 
@@ -374,34 +378,34 @@ them again based on if they are still connected or not in the KNN.
     ## To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
     ## This message will be shown once per session
 
-    ## 16:30:07 UMAP embedding parameters a = 0.9922 b = 1.112
+    ## 14:51:52 UMAP embedding parameters a = 0.9922 b = 1.112
 
     ## Found more than one class "dist" in cache; using the first, from namespace 'spam'
 
     ## Also defined by 'BiocGenerics'
 
-    ## 16:30:07 Read 20135 rows and found 30 numeric columns
+    ## 14:51:52 Read 19505 rows and found 30 numeric columns
 
-    ## 16:30:07 Using Annoy for neighbor search, n_neighbors = 30
+    ## 14:51:52 Using Annoy for neighbor search, n_neighbors = 30
 
     ## Found more than one class "dist" in cache; using the first, from namespace 'spam'
 
     ## Also defined by 'BiocGenerics'
 
-    ## 16:30:07 Building Annoy index with metric = cosine, n_trees = 50
+    ## 14:51:52 Building Annoy index with metric = cosine, n_trees = 50
 
     ## 0%   10   20   30   40   50   60   70   80   90   100%
 
     ## [----|----|----|----|----|----|----|----|----|----|
 
     ## **************************************************|
-    ## 16:30:08 Writing NN index file to temp file /var/folders/d6/8nyzvqcx6559qg6cqv9tkxc40000gn/T//Rtmpz59SQi/filef407162ca564
-    ## 16:30:08 Searching Annoy index using 1 thread, search_k = 3000
-    ## 16:30:12 Annoy recall = 100%
-    ## 16:30:12 Commencing smooth kNN distance calibration using 1 thread with target n_neighbors = 30
-    ## 16:30:13 Initializing from normalized Laplacian + noise (using RSpectra)
-    ## 16:30:13 Commencing optimization for 200 epochs, with 924040 positive edges
-    ## 16:30:19 Optimization finished
+    ## 14:51:53 Writing NN index file to temp file /var/folders/d6/8nyzvqcx6559qg6cqv9tkxc40000gn/T//Rtmpfe2sEI/file75903462c4d2
+    ## 14:51:53 Searching Annoy index using 1 thread, search_k = 3000
+    ## 14:51:56 Annoy recall = 100%
+    ## 14:51:57 Commencing smooth kNN distance calibration using 1 thread with target n_neighbors = 30
+    ## 14:51:57 Initializing from normalized Laplacian + noise (using RSpectra)
+    ## 14:51:57 Commencing optimization for 200 epochs, with 893976 positive edges
+    ## 14:52:04 Optimization finished
 
     DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")
 
@@ -424,16 +428,6 @@ them again based on if they are still connected or not in the KNN.
       filter(p_val_adj < 0.05)
 
     ## Calculating cluster Astrocytes
-
-    ## For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
-    ## (default method for FindMarkers) please install the presto package
-    ## --------------------------------------------
-    ## install.packages('devtools')
-    ## devtools::install_github('immunogenomics/presto')
-    ## --------------------------------------------
-    ## After installation of presto, Seurat will automatically use the more 
-    ## efficient implementation (no further action necessary).
-    ## This message will be shown once per session
 
     ## Calculating cluster Cerebellum neurons
 

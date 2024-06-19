@@ -2,7 +2,7 @@
 title: "Vignette SuperSpot"
 author: "Matei Teleman"
 date: "2024-01-15"
-output: md_document
+output: html_document
 ---
 
 ## Import libraries
@@ -50,7 +50,7 @@ The function "SCimplify_SpatialDLS" uses the raw count matrix and the spatial co
 The main output here is the membership given to each spot to know in which metaspot it is assigned.
 ```{r}
 g = 10 # gamma
-n.pc = 5 # number of first PC to use
+n.pc = 1:5 # number of first PC to use
 k.knn = 16 # number of neighbors to connect to each spot
 
 print("Creating metaspots")
