@@ -50,6 +50,7 @@ supercell_metaspots_shape <- function(MC, spotpositions,annotation,concavity,mem
 #' @param alpha parameter of the alpha for the spots
 #' @param meta_data dataframe containing both the annotations of the spots and their membership
 #' @param alpha_hull parameter of the alpha for the polygons of the metaspots
+#' @param spot.color vector for the spot colors
 #'
 #' @return a ggplot2 plot
 #'
@@ -86,33 +87,33 @@ SpatialDimPlotSC <- function(original_coord,
 
   if (is.null(spot.color)){
     p <- ggplot2::ggplot(seuratCoordMetacell) +
-      ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),
+      ggplot2::geom_point(ggplot2::aes(x = imagecol,y = imagerow,color = cell_type),
                           alpha = alpha) +
-      geom_polygon(data = hull_df_final,
+      ggplot2::geom_polygon(data = hull_df_final,
                    aes(x = x, y = y, fill = cell_type, group = membership),
                    alpha = alpha_hull,
                    color = "black",
                    linetype = "solid")+
-      geom_point(data = seuratCoord.uni,
+      ggplot2::geom_point(data = seuratCoord.uni,
                  mapping = aes(x = imagecol, y=imagerow),
                  size = 0.5)+
-      scale_y_reverse()
+      ggplot2::scale_y_reverse()
   }
   else{
     p <- ggplot2::ggplot(seuratCoordMetacell) +
-      ggplot2::geom_point(aes(x = imagecol,y = imagerow,color = cell_type),
+      ggplot2::geom_point(ggplot2::aes(x = imagecol,y = imagerow,color = cell_type),
                           alpha = alpha) +
-      geom_polygon(data = hull_df_final,
+      ggplot2::geom_polygon(data = hull_df_final,
                    aes(x = x, y = y, fill = cell_type, group = membership),
                    alpha = alpha_hull,
                    color = "black",
                    linetype = "solid") +
-      scale_fill_manual(values = spot.color) +
-      scale_color_manual(values = spot.color) +
-      geom_point(data = seuratCoord.uni,
+      ggplot2::scale_fill_manual(values = spot.color) +
+      ggplot2::scale_color_manual(values = spot.color) +
+      ggplot2::geom_point(data = seuratCoord.uni,
                  mapping = aes(x = imagecol, y=imagerow),
                  size = 0.5)+
-      scale_y_reverse()
+      ggplot2::scale_y_reverse()
   }
 
   return(p)

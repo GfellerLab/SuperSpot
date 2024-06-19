@@ -32,6 +32,8 @@ SpatialDimPlotSC(
 \item{meta_data}{dataframe containing both the annotations of the spots and their membership}
 
 \item{alpha_hull}{parameter of the alpha for the polygons of the metaspots}
+
+\item{spot.color}{vector for the spot colors}
 }
 \value{
 a ggplot2 plot

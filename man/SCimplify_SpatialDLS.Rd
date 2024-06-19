@@ -19,7 +19,6 @@ SCimplify_SpatialDLS(
   cell.split.condition = NULL,
   gamma = 10,
   k.knn = 6,
-  do.scale = TRUE,
   n.pc = 1:30,
   n.cpu = NULL,
   plot.graph = FALSE,
@@ -34,6 +33,8 @@ SCimplify_SpatialDLS(
 }
 \arguments{
 \item{X}{raw count matrix with rows to be genes and cols to be cells}
+
+\item{spotPositions}{a data.frame of the coordinates of the spots}
 
 \item{k.spots}{number of neighborhoods to take into account when choosing the second method to build the KNN}
 
@@ -54,6 +55,7 @@ SCimplify_SpatialDLS(
 \itemize{
 \item "log_normalize" for a Seurat Log Normalization
 \item "SCT" for a Seurat SCT Normalization
+\item "no" for using raw counts
 }}
 
 \item{split_not_connected}{split or not the spots in the KNN graph if their distance is too far compared to the others}
@@ -91,8 +93,6 @@ SCimplify_SpatialDLS(
 \item{return.seurat.object}{whether return seurat object of spots used to computed PCA}
 
 \item{...}{other parameters of \link{build_knn_graph} function}
-
-\item{spotpositions}{a data.frame of the coordinates of the spots}
 }
 \value{
 a list with components

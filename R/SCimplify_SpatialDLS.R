@@ -3,12 +3,14 @@
 #' This function builds the KNN graph to links the spots based on the spatial proximity
 #'
 #'
-#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param spotPositions a data.frame of the coordinates of the spots
 #' @param k.spots number of neighborhoods to take into account when choosing the second method to build the KNN
 #' @param countMatrix raw matrix of the gene expression for each spot
 #' @param n.pc number of principal components to use from PCA
 #' @param n.cpu number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.
 #' @param method_similarity method to compute transcriptional similarity from distance
+#' @param plot.graph boolean of whether or not plotting the KNN graph
+#' @param pct percentage of the connections to keep
 #' \itemize{
 #'   \item "1" - similarity = 1 - (distance/max(distance))
 #'   \item "2" - similarity = exp(-(distance^2)/sigma)
@@ -25,6 +27,7 @@
 #' \itemize{
 #'   \item "log_normalize" for a Seurat Log Normalization
 #'   \item "SCT" for a Seurat SCT Normalization
+#'   \item "no" for using raw counts
 #' }
 #' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
 #' @param split_annotation split or not the spots in the KNN graph based on their annotation
@@ -48,12 +51,12 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     nn2.res <- RANN::nn2(data = spotPositions,k = k.knn+1)
     if (split_not_connected == TRUE){
       #min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F)[3]
-      min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F,probs = pct)
+      min_dist <- stats::quantile(as.vector(nn2.res$nn.dists[,2:k.knn+1]),names = F,probs = pct)
       print(paste0("Neighbors with distance > ",min_dist, " are removed"))
-      plot(ggplot2::ggplot(data = tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
+      plot(ggplot2::ggplot(data = tibble::tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
                                 distribution = rep(".",length(as.vector(nn2.res$nn.dists[,2:k.knn+1])))))+
-             ggplot2::geom_violin(aes(x = distribution, y = distances))+
-             ggplot2::geom_boxplot(aes(x = distribution, y = distances),width = 0.1)+
+             ggplot2::geom_violin(ggplot2::aes(x = distribution, y = distances))+
+             ggplot2::geom_boxplot(ggplot2::aes(x = distribution, y = distances),width = 0.1)+
              ggplot2::geom_hline(yintercept=min_dist, linetype="dashed", color = "red"))
 
       #bad_neighbors_rows <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,1]
@@ -155,12 +158,12 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
   print(paste0("Done"))
   print(paste0("Computing similarity from PCA distances"))
   if (method_similarity == "1"){
-    pca_similarity <- pbapply::pblapply(pca_dist,FUN = function(i){1 - (i/max(pca_dist))}) %>% unlist()
+    pca_similarity <-  unlist(pbapply::pblapply(pca_dist,FUN = function(i){1 - (i/max(pca_dist))}))
     pca_similarity[pca_similarity == 0 ] <- 1e-100
     print(paste0("Done"))
   }
   else if (method_similarity == "2"){
-    pca_similarity <- pbapply::pblapply(pca_dist,FUN = function(i){exp(-(i**2)/sigs)}) %>% unlist()
+    pca_similarity <- unlist(pbapply::pblapply(pca_dist,FUN = function(i){exp(-(i**2)/sigs)}))
     pca_similarity[pca_similarity == 0 ]<- 1e-100
     print(paste0("Done"))
   }
@@ -182,7 +185,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #'
 #'
 #' @param X raw count matrix with rows to be genes and cols to be cells
-#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param spotPositions a data.frame of the coordinates of the spots
 #' @param k.spots number of neighborhoods to take into account when choosing the second method to build the KNN
 #' @param n.pc number of principal components to use from PCA
 #' @param method_similarity method to compute transcriptional similarity from distance
@@ -202,6 +205,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 #' \itemize{
 #'   \item "log_normalize" for a Seurat Log Normalization
 #'   \item "SCT" for a Seurat SCT Normalization
+#'   \item "no" for using raw counts
 #' }
 #' @param split_not_connected split or not the spots in the KNN graph if their distance is too far compared to the others
 #' @param split_annotation split or not the spots in the KNN graph based on their annotation
@@ -263,7 +267,6 @@ SCimplify_SpatialDLS <- function(X,
                                 cell.split.condition = NULL,
                                 gamma = 10,
                                 k.knn = 6,
-                                do.scale = TRUE,
                                 n.pc = 1:30,
                                 n.cpu = NULL,
                                 plot.graph = FALSE,
@@ -363,8 +366,8 @@ SCimplify_SpatialDLS <- function(X,
 
   if(return.singlecell.NW){res$graph.singlecell <- sc.nw}
   if(!is.null(cell.annotation) | !is.null(cell.split.condition)){
-    res$SC.cell.annotation. <- supercell_assign(cell.annotation, res$membership)
-    res$SC.cell.split.condition. <- supercell_assign(cell.split.condition, res$membership)
+    res$SC.cell.annotation. <- SuperCell::supercell_assign(cell.annotation, res$membership)
+    res$SC.cell.split.condition. <- SuperCell::supercell_assign(cell.split.condition, res$membership)
   }
 
 
@@ -381,7 +384,7 @@ SCimplify_SpatialDLS <- function(X,
 #' This function computes the spatial centroids of metaspots from the coordinates of the original spots
 #'
 #'
-#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param spotPositions a data.frame of the coordinates of the spots
 #' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
 #'
 #' @return a dataframe of the centroids coordinates for each metaspot
@@ -396,7 +399,7 @@ supercell_spatial_centroids <- function(MC,spotPositions){
   membership <-MC$membership
   seuratCoordMetacell <- cbind(spotPositions,membership)
 
-  centroids <- stats::aggregate(spotPositions %>% as.matrix() ~membership,spotPositions,mean) #should be taken from object slot
+  centroids <- stats::aggregate(as.matrix(spotPositions) ~ membership,spotPositions,mean) #should be taken from object slot
   centroids[["supercell_size"]] <- MC[["supercell_size"]]
   return(centroids)
 }
@@ -423,7 +426,7 @@ split_membership <- function(m,MC){
   if (!igraph::is.connected(sub_network)) {
     #plot(sub_network)
     #print(m)
-    new_memberships <- clusters(sub_network)$membership
+    new_memberships <- igraph::clusters(sub_network)$membership
     old_memberships <- rep(m, length(vertex.id))
     new_memberships <- paste(old_memberships, new_memberships, sep = "_") #%>% as.numeric()
     memberships[vertex.id] <- new_memberships
@@ -493,7 +496,7 @@ superspot_GE <- function (MC, ge, groups, mode = c("average", "sum"), weights = 
   N.SC <- MC$N.SC
   supercell_size <- as.vector(MC$supercell_size)
   j <- rep(1:N.SC, supercell_size)
-  goups.idx <- plyr::split_indices(groups %>% as.integer())
+  goups.idx <- plyr::split_indices(as.integer(groups))
   i <- unlist(goups.idx)
   if (is.null(weights)) {
     M.AV <- Matrix::sparseMatrix(i = i, j = j)
@@ -555,14 +558,14 @@ shape_metrics <- function(MC,polygon_col,membership_col){
   for (m in unique(full.df$membership)){
     #print(length(unique(full.df_final$membership)))
     #df.tmp <- subset(full.df_final, membership == m)[,1:2] %>% as.matrix()
-    df.tmp <- subset(full.df, membership == m)[,1:2] %>% as.matrix()
+    df.tmp <- as.matrix(subset(full.df, membership == m)[,1:2])
     #if (nrow(df.tmp)> 2)  {
     if (m %in% big.memb)  {
       #plot_polygon(df.tmp,points = T)
       aligned.tmp <- pliman::poly_align(df.tmp,plot = F)
       #plot_polygon(aligned.tmp)
       memberships <- c(memberships,m)
-      elongations <- c(elongations,pliman::poly_elongation(aligned.tmp) %>% abs())
+      elongations <- c(elongations, abs(pliman::poly_elongation(aligned.tmp)))
       circularities <- c(circularities,pliman::poly_circularity_norm(aligned.tmp))
       convexities <- c(convexities,pliman::poly_convexity(aligned.tmp))
     }
@@ -574,7 +577,7 @@ shape_metrics <- function(MC,polygon_col,membership_col){
     }
 
   }
-  metrics <- tibble(memberships = memberships, elongations = elongations, circularities = circularities, convexities = convexities)
+  metrics <- tibble::tibble(memberships = memberships, elongations = elongations, circularities = circularities, convexities = convexities)
   return(metrics)
 }
 

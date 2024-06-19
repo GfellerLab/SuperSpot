@@ -9,7 +9,7 @@ supercell_spatial_centroids(MC, spotPositions)
 \arguments{
 \item{MC}{Metaspot object obtained from SCimplify_SpatialDLS function}
 
-\item{spotpositions}{a data.frame of the coordinates of the spots}
+\item{spotPositions}{a data.frame of the coordinates of the spots}
 }
 \value{
 a dataframe of the centroids coordinates for each metaspot

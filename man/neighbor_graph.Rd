@@ -23,18 +23,15 @@ neighbor_graph(
 )
 }
 \arguments{
+\item{spotPositions}{a data.frame of the coordinates of the spots}
+
 \item{k.spots}{number of neighborhoods to take into account when choosing the second method to build the KNN}
 
 \item{countMatrix}{raw matrix of the gene expression for each spot}
 
 \item{n.pc}{number of principal components to use from PCA}
 
-\item{method_similarity}{method to compute transcriptional similarity from distance
-\itemize{
-\item "1" - similarity = 1 - (distance/max(distance))
-\item "2" - similarity = exp(-(distance^2)/sigma)
-\item "3" - similarity = proxy::pr_dist2simil(distance)
-}}
+\item{method_similarity}{method to compute transcriptional similarity from distance}
 
 \item{method_knn}{method to compute the KNN
 \itemize{
@@ -50,6 +47,7 @@ neighbor_graph(
 \itemize{
 \item "log_normalize" for a Seurat Log Normalization
 \item "SCT" for a Seurat SCT Normalization
+\item "no" for using raw counts
 }}
 
 \item{split_not_connected}{split or not the spots in the KNN graph if their distance is too far compared to the others}
@@ -60,7 +58,14 @@ neighbor_graph(
 
 \item{n.cpu}{number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.}
 
-\item{spotpositions}{a data.frame of the coordinates of the spots}
+\item{plot.graph}{boolean of whether or not plotting the KNN graph}
+
+\item{pct}{percentage of the connections to keep
+\itemize{
+\item "1" - similarity = 1 - (distance/max(distance))
+\item "2" - similarity = exp(-(distance^2)/sigma)
+\item "3" - similarity = proxy::pr_dist2simil(distance)
+}}
 }
 \value{
 a list with components
