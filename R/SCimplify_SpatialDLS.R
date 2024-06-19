@@ -50,11 +50,11 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
       #min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F)[3]
       min_dist <- quantile(nn2.res$nn.dists[,2:k.knn+1] %>% as.vector(),names = F,probs = pct)
       print(paste0("Neighbors with distance > ",min_dist, " are removed"))
-      plot(ggplot(data = tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
+      plot(ggplot2::ggplot(data = tibble(distances = as.vector(nn2.res$nn.dists[,2:k.knn+1]),
                                 distribution = rep(".",length(as.vector(nn2.res$nn.dists[,2:k.knn+1])))))+
-             geom_violin(aes(x = distribution, y = distances))+
-             geom_boxplot(aes(x = distribution, y = distances),width = 0.1)+
-             geom_hline(yintercept=min_dist, linetype="dashed", color = "red"))
+             ggplot2::geom_violin(aes(x = distribution, y = distances))+
+             ggplot2::geom_boxplot(aes(x = distribution, y = distances),width = 0.1)+
+             ggplot2::geom_hline(yintercept=min_dist, linetype="dashed", color = "red"))
 
       #bad_neighbors_rows <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,1]
       #bad_neighbors_cols <- which(nn2.res$nn.dists > round(min_dist+0.6),arr.ind = T)[,2]
@@ -73,7 +73,7 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
 
     if (!is.null(split_annotation)){
       cell_type.id <- which(split_vector == split_annotation)
-      spot.graph <- subgraph(spot.graph,cell_type.id)
+      spot.graph <- igraph::subgraph(spot.graph,cell_type.id)
       spotPositions <- spotPositions[cell_type.id,]
       countMatrix <- countMatrix[,cell_type.id]
     }
@@ -81,23 +81,23 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
     max_gamma <- (nrow(spotPositions)/igraph::components(spot.graph)$no)
     print(paste0("Maximum gamma is ",max_gamma))
     print(paste0("Done"))
-    V(spot.graph)$x <- spotPositions$imagecol
-    V(spot.graph)$y <- -spotPositions$imagerow
   }
   else if (method_knn == "2"){
     print(paste0("Building KNN graph by DLS"))
     print(paste0("Computing distances between spots"))
-    distCoord <- parallelDist::parDist(spotPositions %>% as.matrix(),threads = n.cpu)
+    distCoord <- parallelDist::parDist(as.matrix(spotPositions),threads = n.cpu)
     min.dist <- min(distCoord)
     distCoord[distCoord > k.spots*round(min.dist)] <- 0
     distCoord[distCoord >0] <- 1
-    spot.graph <- graph.adjacency(distCoord %>% as.matrix(),mode = "undirected")
+    spot.graph <- igraph::graph.adjacency(as.matrix(distCoord),mode = "undirected")
     print(paste0("Done"))
   }
 
   if (plot.graph == TRUE){
+    igraph::V(spot.graph)$x <- spotPositions$imagecol
+    igraph::V(spot.graph)$y <- -spotPositions$imagerow
     plot(spot.graph,
-         layout = matrix(c(V(spot.graph)$x, V(spot.graph)$y), ncol = 2),
+         layout = matrix(c(igraph::V(spot.graph)$x,igraph::V(spot.graph)$y), ncol = 2),
          vertex.label.cex = 0.1,
          vertex.size = 1,
          edge.arrow.size = 0.7,
@@ -105,17 +105,33 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
   }
 
 
-  so <- CreateSeuratObject(countMatrix,assay = "RNA")
+  so <- Seurat::CreateSeuratObject(countMatrix,assay = "RNA")
   if (method_normalization == "log_normalize"){
     print(paste0("Performing Log Normalization"))
-    so <- NormalizeData(so)
+    so <- Seurat::NormalizeData(so)
     print(paste0("Done"))
     print(paste0("Running PCA"))
-    so <- FindVariableFeatures(so)
-    so <- ScaleData(so)
+    so <- Seurat::FindVariableFeatures(so)
+    so <- Seurat::ScaleData(so)
     if (max_gamma != 1){
-      so <- RunPCA(so,verbose = F)
-      #ßpca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
+      so <- Seurat::RunPCA(so,verbose = F)
+      #pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
+      pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,n.pc]
+    }
+    else {
+      pca_matrix <- matrix(0,ncol(countMatrix),n.pc)
+    }
+  }
+  else if (method_normalization == "no"){
+    print(paste0("Using Raw Data"))
+    so<-Seurat::SetAssayData(so,new.data = Seurat::GetAssayData(so,assay = "RNA",layer = "counts"),assay = "RNA",layer = "data")
+    print(paste0("Done"))
+    print(paste0("Running PCA"))
+    so <- Seurat::FindVariableFeatures(so)
+    so <- Seurat::ScaleData(so,do.scale = FALSE,do.center = FALSE)
+    if (max_gamma != 1){
+      so <- Seurat::RunPCA(so,verbose = F)
+      #pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,1:n.pc]
       pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,n.pc]
     }
     else {
@@ -124,10 +140,10 @@ neighbor_graph <- function(spotPositions, k.spots, countMatrix, n.pc, method_sim
   }
   else if (method_normalization == "SCT"){
     print(paste0("Performing SCT"))
-    so <- SCTransform(so, new.assay.name = "SCT" , assay = "RNA",verbose = F)
+    so <- Seurat::SCTransform(so, new.assay.name = "SCT" , assay = "RNA",verbose = F)
     print(paste0("Done"))
     print(paste0("Running PCA"))
-    so <- RunPCA(so, assay = "SCT",verbose = F)
+    so <-Seurat::RunPCA(so, assay = "SCT",verbose = F)
     pca_matrix <- so@reductions[["pca"]]@cell.embeddings[,n.pc]
   }
 
@@ -265,7 +281,7 @@ SCimplify_SpatialDLS <- function(X,
                                           split_annotation = split_annotation,split_vector =split_vector, n.cpu = n.cpu,plot.graph = plot.graph,
                                           pct = pct)
 
-  X <- GetAssayData(neighbor_graph.output$seurat.object)
+  X <- Seurat::GetAssayData(neighbor_graph.output$seurat.object)
 
   N.c <- ncol(X)
 
@@ -319,11 +335,11 @@ SCimplify_SpatialDLS <- function(X,
 
 
 
-  membership.all       <- membership.presampled[colnames(X)]
+  membership.all <- membership.presampled[colnames(X)]
 
-  membership       <- membership.all
+  membership <- membership.all
 
-  supercell_size   <- as.vector(table(membership))
+  supercell_size <- as.vector(table(membership))
 
   igraph::E(SC.NW)$width         <- sqrt(igraph::E(SC.NW)$weight/10)
   igraph::V(SC.NW)$size          <- supercell_size
@@ -378,7 +394,7 @@ SCimplify_SpatialDLS <- function(X,
 
 supercell_spatial_centroids <- function(MC,spotPositions){
   membership <-MC$membership
-  seuratCoordMetacell <-  cbind(spotPositions,membership)
+  seuratCoordMetacell <- cbind(spotPositions,membership)
 
   centroids <- stats::aggregate(spotPositions %>% as.matrix() ~membership,spotPositions,mean) #should be taken from object slot
   centroids[["supercell_size"]] <- MC[["supercell_size"]]
@@ -403,7 +419,7 @@ supercell_spatial_centroids <- function(MC,spotPositions){
 split_membership <- function(m,MC){
   memberships <- MC$membership
   vertex.id <- which(memberships == m)
-  sub_network <- subgraph(MC$graph.singlecell, vertex.id)
+  sub_network <- igraph::subgraph(MC$graph.singlecell, vertex.id)
   if (!igraph::is.connected(sub_network)) {
     #plot(sub_network)
     #print(m)
@@ -440,7 +456,7 @@ split_unconnected <- function(MC){
   rv <- 1:length(unique(split.memb))
   names(rv) <- unique(split.memb)
   final_memb <- plyr::revalue(split.memb,rv)
-  MC$membership <- final_memb %>% as.integer()
+  MC$membership <- as.integer(final_memb)
   names(MC$membership) <- names(memberships)
   #MC$supercell_size <- table(MC$membership) %>% unname()
   MC$supercell_size <- as.vector(table(MC$membership))

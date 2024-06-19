@@ -54,6 +54,7 @@ n.pc = 5 # number of first PC to use
 k.knn = 16 # number of neighbors to connect to each spot
 
 print("Creating metaspots")
+# By default, SCimplify_SpatialDLS computes distances in a parallalized way. By default, all the available cpus are used. If your computer doesn't support, you can change the number of cpus with the paramater "n.cpu"
 MC.well7_DLS <- SCimplify_SpatialDLS(X = well7.mtx ,
                                      spotPositions = spotPosition ,
                                      method_similarity = "1",
@@ -137,6 +138,7 @@ SpatialDimPlotSC(original_coord = spotPosition,
 ```
 
 ## Create Seurat object from metaspot object
+As normalization is a matter of debate for spatial transcriptomics data, we use here Log Normalization. But SuperSpot offers also using SCT and using raw counts.
 ```{r,fig.height=20, fig.width=20}
 MC_centroids <- supercell_spatial_centroids(MC.well7_DLS.spl,spotPositions = spotPosition)
 

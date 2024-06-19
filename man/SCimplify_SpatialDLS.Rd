@@ -20,8 +20,10 @@ SCimplify_SpatialDLS(
   gamma = 10,
   k.knn = 6,
   do.scale = TRUE,
-  n.pc = 5,
+  n.pc = 1:30,
   n.cpu = NULL,
+  plot.graph = FALSE,
+  pct = 0.6,
   seed = 12345,
   igraph.clustering = c("walktrap", "louvain"),
   return.singlecell.NW = TRUE,
@@ -73,6 +75,10 @@ SCimplify_SpatialDLS(
 \item{n.pc}{number of principal components to use for construction of single-cell kNN network}
 
 \item{n.cpu}{number of cpu to use during parallelized computation of distances. By default, the maximum amount of cpu available is chosen automatically. But if your computer doesn't support it, please specify your desired number of cpu.}
+
+\item{plot.graph}{boolean of whether or not plotting the KNN graph}
+
+\item{pct}{percentage of the connections to keep}
 
 \item{seed}{seed to use to subsample cells for an approximate approach}
 

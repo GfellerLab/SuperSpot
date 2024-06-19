@@ -18,15 +18,15 @@ library(igraph)
 
 ## Import data
 ```{r}
-panc <- readRDS("/Users/admin/Documents/These/data/PancreasCosMx/Seurat_Pancreas_withTranscripts.rds")
+panc <- readRDS("./data/PancreasCosMx/Seurat_Pancreas_withTranscripts.rds")
 pattern_to_exclude <- "Negative[0-9]+|SystemControl[0-9]+"
-mtx <- read_csv("/Users/admin/Documents/These/data/PancreasCosMx/Pancreas_exprMat_file.csv")
+mtx <- read_csv("./data/PancreasCosMx/Pancreas_exprMat_file.csv")
 columns_to_keep <- grep(pattern_to_exclude, colnames(mtx), invert = TRUE, value = TRUE)
 mtx <- mtx[, columns_to_keep]
 mtx.flt <- mtx[,3:ncol(mtx)] %>% t() %>% as.sparse()
-metad <- read_csv("/Users/admin/Documents/These/data/PancreasCosMx/Pancreas_metadata_file.csv")
+metad <- read_csv("./data/PancreasCosMx/Pancreas_metadata_file.csv")
 metad <- column_to_rownames(metad,"cell_id")
-meta <- readRDS("/Users/admin/Documents/These/data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+meta <- readRDS("./data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
 metad$cell_type <- meta[rownames(metad), "cell_types"]
 metad$cell_type[is.na(metad$cell_type)] <- "QC_dropped"
 colnames(mtx.flt) <- rownames(metad)
@@ -148,11 +148,11 @@ MC.seurat <- supercell_2_Seuratv5(
   fields = c("cell_type")
 )
 rm(MC.ge)
-#MC.seurat <- NormalizeData(MC.seurat)
+MC.seurat <- NormalizeData(MC.seurat)
 
-#MC.seurat <- ScaleData(MC.seurat)
+MC.seurat <- ScaleData(MC.seurat)
 
-#MC.seurat <- FindVariableFeatures(MC.seurat)
+MC.seurat <- FindVariableFeatures(MC.seurat)
 
 MC.seurat <- SCTransform(MC.seurat)
 
@@ -167,7 +167,7 @@ DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors)
 DimPlot(MC.seurat, reduction = "umap",cols = distinctive_colors) -> p
 umap_sized.df <- cbind(p[[1]]$data,MC.full.spl$supercell_size)
 colnames(umap_sized.df)[4] <- "superspot_size"
-ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.5)+ 
+ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.1)+ 
      scale_fill_manual(values=distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
                                                          axis.text = element_text(color="black"),
                                                          axis.title = element_text(color="black"),
@@ -213,35 +213,20 @@ ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_si
                                                          axis.title = element_text(color="black"),
                                                          legend.text = element_text(color="black"),axis.line.x = element_line(color="black"),
                                                          axis.line.y = element_line(color="black"))+NoLegend()
-
-
-mc.markers.log <-  FindAllMarkers(MC.seurat.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "RNA" ) %>%filter(p_val_adj < 0.05)
-
-mc.top.markers.log <- mc.markers.log %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
-  
-mc.markers.sct <-  FindAllMarkers(MC.seurat.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "SCT" ) %>%filter(p_val_adj < 0.05)
-
-mc.top.markers.sct <- mc.markers.sct %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
-
-Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.log$gene,assay = "RNA",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
-Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.sct$gene,assay = "SCT",slot = "data",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
-
-saveRDS(MC.seurat.sb,file = "/Users/admin/Documents/GitHub/SuperSpot/MC_seurat_sb.rds")
 ```
 
-## Acinar.1
 
 ```{r}
-nano.obj <- LoadNanostring(data.dir = "/Users/admin/Documents/These/data/PancreasCosMx", fov = "pancreas")
+nano.obj <- LoadNanostring(data.dir = "./data/PancreasCosMx", fov = "pancreas")
 
 # add in precomputed annotations
-meta <- readRDS("/Users/admin/Documents/These/data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+meta <- readRDS("./data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
 meta$new_cell_ID <- sub("c_1_(\\d+)_(\\d+)", "\\2_\\1", meta$cell_ID)
 rownames(meta) <- meta$new_cell_ID
 nano.obj@meta.data$types <- meta[rownames(nano.obj@meta.data), "cell_types"]
 nano.obj@meta.data$types[is.na(nano.obj@meta.data$types)] <- "QC_dropped"
 Idents(nano.obj) <- nano.obj$types
-
+levels(MC.seurat.sb) <- sort(levels(MC.seurat.sb))
 # set to avoid error exceeding max allowed size of globals
 options(future.globals.maxSize = 8000 * 1024^2)
 
@@ -263,79 +248,67 @@ distinctive_colors <- c('#E59CC4', '#53A85F', '#F1BB72', '#F3B1A0', '#D6E7A3', '
 DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))+NoLegend()
 DimPlot(nano.obj.sb,cols = distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"))
 
-sp.markers.log <-  FindAllMarkers(nano.obj.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "Nanostring" ) %>%filter(p_val_adj < 0.05)
-
-sp.top.markers.log <- sp.markers.log %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
-  
-sp.markers.sct <-  FindAllMarkers(nano.obj.sb,only.pos = TRUE,logfc.threshold = 0.25,assay = "SCT" ) %>%filter(p_val_adj < 0.05)
-
-sp.top.markers.sct <- sp.markers.sct %>% group_by(cluster) %>% slice_max(n = 5, order_by = avg_log2FC)
-Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.log$gene,assay = "Nanostring",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
-Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.sct$gene,assay = "SCT",slot = "data",group.colors = distinctive_colors[1:11])+ scale_fill_gradientn(colors = c("blue", "white", "red"))
-
-saveRDS(nano.obj.sb,file = "/Users/admin/Documents/GitHub/SuperSpot/nano_obj_sb.rds")
-```
-
-
-```{r}
-# Step 1: Identify the cell type of interest in metadata (e.g., using the 'idents' function)
-# Let's say your cell types are stored in a metadata column named 'cell_type'
-#cell_types <- Idents(object = seurat_object)
-
-# Step 2: Filter cells belonging to the cell type of interest
-cells_of_interest <- WhichCells(object = nano.obj.sb, idents = "Acinar.1")
-
-# Step 3: Calculate the percentage of these cells expressing the gene of interest
-# Define the gene of interest
-gene_of_interest <- "PNLIPRP1"
-
-# Fetch the expression data for the gene of interest
-expression_data <- FetchData(object = nano.obj.sb, vars = gene_of_interest, cells = cells_of_interest)
-
-# Determine the number of cells with expression > 0 (or another threshold if preferred)
-expressing_cells_count <- sum(expression_data[[gene_of_interest]] > 0)
-
-# Calculate the percentage
-percentage_expressing <- expressing_cells_count / length(cells_of_interest) * 100
-
-# Print the result
-percentage_expressing
-```
-
-
-```{r}
-# Step 1: Identify the cell type of interest in metadata (e.g., using the 'idents' function)
-# Let's say your cell types are stored in a metadata column named 'cell_type'
-#cell_types <- Idents(object = seurat_object)
-
-# Step 2: Filter cells belonging to the cell type of interest
-cells_of_interest.mc <- WhichCells(object = MC.seurat, idents = "Acinar.1")
-
-# Step 3: Calculate the percentage of these cells expressing the gene of interest
-# Define the gene of interest
-gene_of_interest.mc <- "PNLIPRP1"
-
-# Fetch the expression data for the gene of interest
-expression_data.mc <- FetchData(object = MC.seurat, vars = gene_of_interest.mc, cells = cells_of_interest.mc)
-
-# Determine the number of cells with expression > 0 (or another threshold if preferred)
-expressing_cells_count.mc <- sum(expression_data.mc[[gene_of_interest.mc]] > 0)
-
-# Calculate the percentage
-percentage_expressing.mc <- expressing_cells_count.mc / length(cells_of_interest.mc) * 100
-
-# Print the result
-percentage_expressing.mc
+saveRDS(nano.obj.sb,file = "./SuperSpot/nano_obj_sb.rds")
 ```
 
 ```{r}
-barplot(c(percentage_expressing,percentage_expressing.mc))
-VlnPlot(nano.obj,"PNLIPRP1",idents = "Acinar.1") -> v1
-VlnPlot(MC.seurat,"PNLIPRP1",idents = "Acinar.1") -> v2
-
+VlnPlot(nano.obj.sb,"nCount_Nanostring",group.by = "orig.ident") -> v1
+VlnPlot(MC.seurat.sb,"nCount_RNA",group.by = "orig.ident") -> v2
+colnames(v1[[1]][["data"]])[1] <- "nCount"
+colnames(v2[[1]][["data"]])[1] <- "nCount"
 vln.df <- rbind(v1[[1]][["data"]],v2[[1]][["data"]])
 vln.df$Condition <- c(rep("spot",nrow(v1[[1]][["data"]])),rep("metaspot",nrow(v2[[1]][["data"]])))
-ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),aes(x = Condition, y = PNLIPRP1, fill = Condition))+geom_violin()+
+
+ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),aes(x = Condition, y = nCount, fill = Condition))+geom_boxplot()+
+  scale_y_continuous(trans='log10')+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20)) +
+  RotatedAxis()+NoLegend()+ stat_compare_means(method = "wilcox.test",paired = F)
+
+
+VlnPlot(nano.obj.sb,"nFeature_Nanostring",group.by = "orig.ident") -> v1
+VlnPlot(MC.seurat.sb,"nFeature_RNA",group.by = "orig.ident") -> v2
+colnames(v1[[1]][["data"]])[1] <- "nFeature"
+colnames(v2[[1]][["data"]])[1] <- "nFeature"
+vln.df <- rbind(v1[[1]][["data"]],v2[[1]][["data"]])
+vln.df$Condition <- c(rep("spot",nrow(v1[[1]][["data"]])),rep("metaspot",nrow(v2[[1]][["data"]])))
+
+ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),aes(x = Condition, y = nFeature, fill = Condition))+geom_boxplot()+
+  scale_y_continuous(trans='log10')+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20)) +
+  RotatedAxis()+NoLegend()+ stat_compare_means(method = "wilcox.test",paired = F)
+```
+
+```{r}
+VlnPlot(nano.obj.sb,"nCount_Nanostring",group.by = "types") -> v1
+VlnPlot(MC.seurat.sb,"nCount_RNA",group.by = "cell_type") -> v2
+colnames(v1[[1]][["data"]])[1] <- "nCount"
+colnames(v2[[1]][["data"]])[1] <- "nCount"
+vln.df <- rbind(v1[[1]][["data"]],v2[[1]][["data"]])
+vln.df$Condition <- c(rep("spot",nrow(v1[[1]][["data"]])),rep("metaspot",nrow(v2[[1]][["data"]])))
+
+ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")), ident = factor(ident, levels = names(sort(table(nano.obj.sb@meta.data$types)/table(MC.seurat.sb@meta.data$cell_type),decreasing = T)))),aes(x = ident, y = nCount, fill = Condition))+geom_boxplot()+
+  scale_y_continuous(trans='log10')+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text = element_text(size = 20)) +
+  RotatedAxis()+NoLegend()
+
+VlnPlot(nano.obj.sb,"nFeature_Nanostring",group.by = "types") -> v1
+VlnPlot(MC.seurat.sb,"nFeature_RNA",group.by = "cell_type") -> v2
+colnames(v1[[1]][["data"]])[1] <- "nFeature"
+colnames(v2[[1]][["data"]])[1] <- "nFeature"
+vln.df <- rbind(v1[[1]][["data"]],v2[[1]][["data"]])
+vln.df$Condition <- c(rep("spot",nrow(v1[[1]][["data"]])),rep("metaspot",nrow(v2[[1]][["data"]])))
+
+ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot")), ident = factor(ident, levels = names(sort(table(nano.obj.sb@meta.data$types)/table(MC.seurat.sb@meta.data$cell_type),decreasing = T)))),aes(x = ident, y = nFeature, fill = Condition))+geom_boxplot()+
+  scale_y_continuous(trans='log10')+
   theme_bw() +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
@@ -345,53 +318,11 @@ ggplot(vln.df %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot",
 
 
 ```{r}
-expression_data <- GetAssayData(nano.obj.sb, assay = "Nanostring", slot = "data") %>% as.matrix()
-gene_interest <- "PNLIPRP1"
-# Ensure gene of interest is in the dataset
-# Ensure gene of interest is in the dataset
-if (gene_interest %in% rownames(expression_data)) {
-    gene_data <- expression_data[gene_interest, , drop = FALSE]
-    # Make it a column vector
-    gene_data_matrix <- matrix(gene_data, nrow = length(gene_data), ncol = 1)
-    # Compute correlation
-    #correlations <- cor( expression_data,gene_data_matrix, method = "pearson")
-    correlations <- cor(t(expression_data),t(gene_data), method = "pearson")
-} else {
-    stop("Gene of interest not found in the dataset.")
-}
-
-correlations[gene_interest,] <- 0  # Remove self-correlation
-most_correlated_gene <- rownames(correlations)[which.max(abs(correlations))]
-print(paste("Most correlated gene:", most_correlated_gene))
-print(paste("Correlation coefficient:", correlations[most_correlated_gene,]))
-
-FeatureScatter(nano.obj.sb, feature1 = "PNLIPRP1", 
-    feature2 = most_correlated_gene,)
-plot(expression_data["PNLIPRP1",],expression_data[most_correlated_gene,])
-```
-
-```{r}
-benchmark.results <- read_csv("/Users/admin/Documents/GitHub/SuperSpot/figures/human_pancreas/benchmarking/results_memory.csv")
-benchmark.results$Peak_RAM_Used_Go <- (benchmark.results$Peak_RAM_Used_MiB)/953.7
-plot(1:25,benchmark.results$Peak_RAM_Used_Go,type = "b")
-plot(1:25,benchmark.results$Elapsed_Time_sec,type = "b")
-```
-
-```{r}
-nano.obj.sb@meta.data$project <- rep("global",nrow(nano.obj.sb@meta.data))
-VlnPlot(nano.obj.sb,features = "nFeature_Nanostring",group.by = "project")[[1]][["data"]] -> v1
-MC.seurat.sb@meta.data$project <- rep("global",nrow(MC.seurat.sb@meta.data))
-VlnPlot(MC.seurat.sb,features = "nFeature_RNA",group.by = "project")[[1]][["data"]] -> v2
-colnames(v1)[1] <- "nFeatures"
-colnames(v2)[1] <- "nFeatures"
-vln.final <- rbind(v1,v2)
-vln.final$condition <- c(rep("spot",nrow(v1)),rep("metaspot",nrow(v2)))
-ggplot(vln.final%>% dplyr::mutate(condition = factor(condition, levels = c("spot","metaspot"))),aes(x = condition, y = nFeatures, fill = condition)) + geom_violin() +
-  theme_bw() +
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        text = element_text(size = 20),legend.position="top") +
-  RotatedAxis()
+benchmark.results <- read_csv("./SuperSpot/figures/human_pancreas/benchmarking/results/results_memory.csv")
+benchmark.results$Peak_RAM_Used_GB <- (benchmark.results$Peak_RAM_Used_MiB)/953.7
+benchmark.results$Elapsed_Time_hour <- (benchmark.results$Elapsed_Time_sec)/3600
+plot(1:25,benchmark.results$Peak_RAM_Used_GB,type = "b")
+plot(1:25,benchmark.results$Elapsed_Time_hour,type = "b")
 ```
 
 ```{r}
@@ -406,54 +337,12 @@ merged.so[["Nanostring"]] <- NULL
 merged.so <- JoinLayers(object = merged.so)
 Idents(merged.so) <- merged.so$annotation
 
-saveRDS(merged.so,file = "/Users/admin/Documents/GitHub/SuperSpot/merged_so.rds")
-Seurat::DoHeatmap(merged.so,sp.top.markers.log$gene,assay = "RNA",group.by = "annotation")+ scale_fill_gradientn(colors = c("white", "grey", "red"))+NoLegend()
-
-cells_to_plot <- WhichCells(merged.so,idents = c("Acinar.1_spot","Acinar.1_metaspot","Acinar.2_spot","Acinar.2_metaspot","Ductal_spot","Ductal_metaspot"))
-Seurat::DoHeatmap(merged.so,subset(sp.top.markers.log,cluster %in% c("Acinar.1","Acinar.2","Ductal"))$gene,assay = "RNA",group.by = "annotation",cells = cells_to_plot,slot = "data")+ scale_fill_gradientn(colors = c("grey", "red"))+NoLegend()
+saveRDS(merged.so,file = "./SuperSpot/merged_so.rds")
 ```
 
 ```{r}
-Seurat::DoHeatmap(nano.obj.sb,sp.top.markers.log$gene,assay = "Nanostring",group.colors = distinctive_colors[1:11],group.by = "types")[[1]][["data"]]-> h1
-Seurat::DoHeatmap(MC.seurat.sb,sp.top.markers.log$gene,assay = "RNA",group.colors = distinctive_colors[1:11],group.by = "cell_type")[[1]][["data"]] -> h2
-h1$Identity <- paste0(h1$Identity,"_spot")
-h2$Identity <- paste0(h2$Identity,"_metaspot")
-heat.df <- rbind(h1,h2)
-ggplot(heat.df, aes(Fea))
+merged.so.sb <- subset(merged.so, idents = c("Acinar.1_spot","Ductal_spot","Acinar.1_metaspot","Ductal_metaspot"))
+levels(merged.so.sb) <- c("Acinar.1_spot","Ductal_spot","Acinar.1_metaspot","Ductal_metaspot")
+a1_v_d <- FindMarkers(merged.so.sb,ident.1 = "Acinar.1_spot",ident.2 = "Ductal_spot") %>% filter(p_val_adj < 0.05)
+DoHeatmap(merged.so.sb,c("RBPJL",'PNLIPRP2','PDIA2','AMY1C','GP2','KYAT3','FAM209B','MMD2','PNLIP','CSTPP1','SPP1','CLU','ATP1B1','ANXA4','KRT8','SERPINA3','SLC4A4','AMBP','TM4SF4','AQP1'),group.colors = c("#E59CC4" , "#FF7F00",'#E59CC4' , "#FF7F00"))+ scale_fill_gradient2( low = rev(c('#d1e5f0','#67a9cf','#2166ac')), mid = "white", high = rev(c('#b2182b','#ef8a62','#fddbc7')), midpoint = 0, guide = "colourbar", aesthetics = "fill")
 ```
-
-```{r}
-merged.so.sb <- subset(merged.so, idents = c("Acinar.1_spot","Acinar.2_spot","Ductal_spot","Acinar.1_metaspot","Acinar.2_metaspot","Ductal_metaspot"))
-levels(merged.so.sb) <- c("Acinar.1_spot","Acinar.2_spot","Ductal_spot","Acinar.1_metaspot","Acinar.2_metaspot","Ductal_metaspot")
-Seurat::DoHeatmap(merged.so.sb,subset(sp.top.markers.log,cluster %in% c("Acinar.1","Acinar.2","Ductal"))$gene,assay = "RNA",cells = cells_to_plot,slot = "data",group.colors = c("#E59CC4", "#53A85F", "#FF7F00",'#E59CC4', '#53A85F', "#FF7F00"))+ scale_fill_gradientn(colors = c("lightgrey", "red"))+NoLegend()
-```
-
-```{r}
-a1_v_a2 <- FindMarkers(merged.so.sb,ident.1 = "Acinar.1_spot",ident.2 = "Acinar.2_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-a1_v_d <- FindMarkers(merged.so.sb,ident.1 = "Acinar.1_spot",ident.2 = "Ductal_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-a1_genes <- intersect(rownames(a1_v_a2),rownames(a1_v_d))
-
-a1_df <- tibble(genes = a1_genes, a2_logFC = a1_v_a2[a1_genes,"avg_log2FC"], d_logFC = a1_v_d[a1_genes,"avg_log2FC"])
-a1_df$avg_logFC <- rowMeans(a1_df[,2:3])
-a1_df <- a1_df[order(a1_df$avg_logFC, decreasing = TRUE),]
-a1_df$genes[1:5]
-
-a2_v_a1 <- FindMarkers(merged.so.sb,ident.1 = "Acinar.2_spot",ident.2 = "Acinar.1_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-a2_v_d <- FindMarkers(merged.so.sb,ident.1 = "Acinar.2_spot",ident.2 = "Ductal_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-a2_genes <- intersect(rownames(a2_v_a1),rownames(a2_v_d))
-
-a2_df <- tibble(genes = a2_genes, a1_logFC = a2_v_a1[a2_genes,"avg_log2FC"], d_logFC = a2_v_d[a2_genes,"avg_log2FC"])
-a2_df$avg_logFC <- rowMeans(a2_df[,2:3])
-a2_df <- a2_df[order(a2_df$avg_logFC, decreasing = TRUE),]
-a2_df$genes[1:5]
-
-d_v_a1 <- FindMarkers(merged.so.sb,ident.1 = "Ductal_spot",ident.2 = "Acinar.1_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-d_v_a2 <- FindMarkers(merged.so.sb,ident.1 = "Ductal_spot",ident.2 = "Acinar.2_spot") %>% filter(p_val_adj < 0.05 & avg_log2FC > 0)
-d_genes <- intersect(rownames(d_v_a1),rownames(d_v_a2))
-
-d_df <- tibble(genes = d_genes, a1_logFC = d_v_a1[d_genes,"avg_log2FC"], a2_logFC = d_v_a2[d_genes,"avg_log2FC"])
-d_df$avg_logFC <- rowMeans(d_df[,2:3])
-d_df <- d_df[order(d_df$avg_logFC, decreasing = TRUE),]
-d_df$genes[1:5]
-```
-

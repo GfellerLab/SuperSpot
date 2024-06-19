@@ -23,6 +23,9 @@ if (!requireNamespace("remotes")) install.packages("remotes")
 remotes::install_github("GfellerLab/SuperSpot")
 ```
 
+## Example
+An example vignette is available (see [example](./example.html)).
+
 ## License
 SuperSpot can be used freely by academic groups for non-commercial purposes.
 The product is provided free of charge, and, therefore, on an "as is" basis, without warranty of any kind. 

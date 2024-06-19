@@ -12,7 +12,8 @@ SpatialDimPlotSC(
   polygons_col,
   alpha = 1,
   meta_data,
-  alpha_hull = 0.5
+  alpha_hull = 0.5,
+  spot.color = NULL
 )
 }
 \arguments{

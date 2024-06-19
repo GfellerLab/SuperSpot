@@ -17,7 +17,9 @@ neighbor_graph(
   split_not_connected,
   split_annotation,
   split_vector,
-  n.cpu
+  n.cpu,
+  plot.graph,
+  pct
 )
 }
 \arguments{

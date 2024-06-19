@@ -3,6 +3,8 @@ title: "Benchmarking Metaspots"
 author: "Matei Teleman"
 date: "2024-04-15"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 ## Creating Metaspots
 ```{r}
@@ -25,19 +27,30 @@ library(ggforce)
 library(clusterProfiler)
 library(SuperSpot)
 dlpfc151673 <- Load10X_Spatial("/Users/admin/Downloads/151673")
+dlpfc151673 <- readRDS("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/cortex_with_membership.rds")
 metadata_151673 <- read.table("/Users/admin/Downloads/metadata.tsv",sep = "\t")
 dlpfc151673@meta.data$layer_guess <- metadata_151673$layer_guess
+dlpfc151673@meta.data$layer_guess[is.na(dlpfc151673@meta.data$layer_guess)] <- "Unknown"
+dlpfc151673 <- RenameIdents(dlpfc151673, 'WM' = 'White Matter')
 SpatialDimPlot(dlpfc151673,group.by = "layer_guess")
 
 #mtx <- dlpfc151673@assays$Spatial@layers$counts# %>% as.data.frame()
-mtx <- GetAssayData(dlpfc151673,assay = "Spatial",slot = "counts")
+mtx <- GetAssayData(dlpfc151673,assay = "Spatial",layer = "counts")
 
 spotPositions <- GetTissueCoordinates(dlpfc151673)
 
 dlpfc151673 <- FindVariableFeatures(dlpfc151673,nfeatures = 2000)
 hvg <- VariableFeatures(dlpfc151673)
 
-MC_DLS.spl <- SCimplify_SpatialDLS(X = mtx,spotPositions = spotPositions,method_similarity = "1", genes.use = hvg,gamma = 5 , n.pc = 1:30,method_knn = "1",k.knn = 6 , cell.annotation = dlpfc151673@meta.data$layer_guess , method_normalization = "log_normalize",split_not_connected = T)
+MC_DLS.spl <- SCimplify_SpatialDLS(X = mtx,
+                                   spotPositions = spotPositions,
+                                   method_similarity = "1",
+                                   genes.use = hvg,gamma = 4,
+                                   n.pc = 1:30,
+                                   method_knn = "1",
+                                   k.knn = 6 ,
+                                   #cell.annotation = dlpfc151673@meta.data$layer_guess ,
+                                   method_normalization = "log_normalize",split_not_connected = T)
 
 dlpfc151673@meta.data$MC_membership_spl <- MC_DLS.spl$membership %>% as.character()
 
@@ -459,7 +472,8 @@ dlpfc151673_metaspot@images$slice1 <- metaspot_image
 SpatialDimPlot(dlpfc151673_metaspot)
 
 count <- dlpfc151673_metaspot@assays$Spatial@layers$counts
-meta_data <- data.frame(row=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]], col=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]])
+#meta_data <- data.frame(row=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]], col=dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]])
+meta_data <- data.frame(row=GetTissueCoordinates(dlpfc151673_metaspot)$y, col=GetTissueCoordinates(dlpfc151673_metaspot)$x)
 row.names(meta_data) <- colnames(count)
 ## create Seurat object
 so <- CreateSeuratObject(counts=count, meta.data = meta_data)
@@ -496,10 +510,10 @@ library(BayesSpace)
 #dlpfc151673_metaspot <- NormalizeData(dlpfc151673_metaspot)
 
 insh <- as.SingleCellExperiment(dlpfc151673_metaspot)
-insh@colData@listData$row <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]]
-insh@colData@listData$col <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]]
-insh@colData@listData$imagerow <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagerow"]]
-insh@colData@listData$imagecol <- dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagecol"]]
+insh@colData@listData$row <- meta_data$row #dlpfc151673_metaspot@images[["slice1"]]@coordinates[["row"]]
+insh@colData@listData$col <- meta_data$col #dlpfc151673_metaspot@images[["slice1"]]@coordinates[["col"]]
+insh@colData@listData$imagerow <- meta_data$row #dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagerow"]]
+insh@colData@listData$imagecol <- meta_data$col #dlpfc151673_metaspot@images[["slice1"]]@coordinates[["imagecol"]]
 
 for (i in 1:10){
   set.seed(seed_values[i])

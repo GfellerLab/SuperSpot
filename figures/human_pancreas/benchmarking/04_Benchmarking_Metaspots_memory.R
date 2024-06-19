@@ -5,58 +5,57 @@ library(tidyr)
 library(tidyverse)
 library(igraph)
 library(peakRAM)
+#devtools::install_github("RfastOfficial/Rfast2")
+#install.packages("Rfast2")
+
+#print(!requireNamespace('Rfast2'))
+library(Rfast2)
+print(library(Rfast2))
 
 #starting_times <- c()
 #ending_times <- c()
 
 processing <- function(g){
   print(paste0("gamma is: ",g))
-  #start_time <- Sys.time()
-  #starting_times <- c(starting_times,start_time)
-  so <- readRDS(paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/MC.seurat_g",g,".rds"))
-  #so <- readRDS(paste0("/Volumes/Analyses/Thèse/2023/data/MC.fs.seurat_g",g,".rds"))
-  #so <- NormalizeData(so)
-  # MC.seurat <- SetAssayData(
-  #     object = MC.seurat,
-  #     layer = "data",
-  #     new.data = GetAssayData(MC.seurat,layer = "counts"),
-  #     assay = "RNA"
-  # )
+  assay <- "Nanostring"
+  data <- Seurat::ReadNanostring(data.dir = "./SuperSpot/01_Data/PancreasCosMx",
+                                 mtx.file = paste0("count_ms_g",g,".csv"),
+                                 metadata.file = paste0("Pancreas_metaspot_g",g,".csv"),
+                                 type = "centroids")
+  #segs <- CreateSegmentation(data$segmentations)
+  segs <- NULL
+  cents <- CreateCentroids(data$centroids)
+  segmentations.data <- list(centroids = cents, segmentation = segs)
+  #coords <- CreateFOV(coords = segmentations.data, type = c("segmentation","centroids"), molecules = data$pixels, assay = assay)
+  coords <- CreateFOV(coords = cents, type = c("segmentation","centroids"), molecules = data$pixels, assay = assay)
+  obj <- CreateSeuratObject(counts = data$matrix, assay = assay)
+  #cells <- intersect(Cells(x = coords, boundary = "segmentation"),
+  #Cells(x = coords, boundary = "centroids"))
+  cells <- Cells(x = coords, boundary = "centroids")
+  cells <- intersect(Cells(obj), cells)
+  coords <- subset(x = coords, cells = cells)
+  obj[["pancreas"]] <- coords
 
-  #so <- ScaleData(so)
 
-  #so <- FindVariableFeatures(so)
-  so <- SCTransform(so)
-  so <- RunPCA(so)
-
-  so <- RunUMAP(so, dims = 1:30)
-
-
-  Idents(so) <- "cell_type"
-  levels(so) <- sort(levels(so))
-  jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/umap_mc_",g,".jpeg"))
-  #jpeg(file=paste0("/Volumes/Analyses/Thèse/2023/data/umap_mc_spl_",g,".jpeg"))
-  plot(DimPlot(so))
+  #obj <- FindVariableFeatures(obj)
+  #obj <- NormalizeData(obj)
+  #obj <- ScaleData(obj)
+  obj <- SCTransform(obj,assay = assay)
+  MC_centroids <- read.csv(file = paste0("./SuperSpot/01_Data/PancreasCosMx/Centroids_metaspot_g",g,".csv"))
+  MC_centroids <- as.matrix(MC_centroids)
+  colnames(MC_centroids) <- c("x","y")
+  obj@images[["pancreas"]]@boundaries[["centroids"]]@coords <- t(MC_centroids)
+  print("Computing SVF")
+  obj <- FindSpatiallyVariableFeatures(obj, assay = "SCT", features = VariableFeatures(obj)[1:1000],selection.method = "moransi")
+  svf.df_sorted <- obj@assays[["SCT"]]@meta.features[order(obj@assays[["SCT"]]@meta.features$moransi.spatially.variable.rank, decreasing = F), ]
+  svf <- rownames(svf.df_sorted)
+  print("Done")
+  print(paste0("top 10 svf are: ",svf[1:10]))
+  jpeg(file=paste0("./01_Data/svf_mc_",g,".jpeg"),width = 3440,height = 1440)
+  plot(ImageFeaturePlot(obj, fov = "pancreas", features =  svf[1:6], max.cutoff = "q95"))
   dev.off()
-
-  #VlnPlot(so,"nFeature_RNA")+NoLegend()
-
-  #Compute marker genes
-  mc.markers <-  FindAllMarkers(so,
-                                only.pos = TRUE,
-                                #min.pct = 0.25,
-                                logfc.threshold = 0.25 ) %>%
-    filter(p_val_adj < 0.05)
-
-  mc.top.markers <- mc.markers %>%
-    group_by(cluster) %>%
-    slice_max(n = 20, order_by = avg_log2FC)
-  #end_time <- Sys.time()
-  #ending_times <- c(ending_times,end_time)
+  save(svf,file = paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/svf_mc_",g,".rda"))
 }
-
-#time_df <- tibble::tibble(starting_times = starting_times, ending_times = ending_times)
-#write.csv(time_df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/time_results.csv")
 
 
 
@@ -88,5 +87,5 @@ mem.df <- peakRAM::peakRAM(
   processing(25))
 
 
-saveRDS(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/results_memory.rds")
-write.csv(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/results_memory.csv")
+saveRDS(mem.df,"./SuperSpot/01_Data/results_memory.rds")
+write.csv(mem.df,"./SuperSpot/01_Data/results_memory.csv")
