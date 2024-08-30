@@ -12,8 +12,6 @@ Imports:
     Matrix,
     RANN,
     Seurat,
-    SuperCell,
-    bluster,
     concaveman,
     ggplot2,
     igraph,
@@ -25,3 +23,6 @@ Imports:
     GeneNMF,
     progress,
     tibble
+Remotes:
+    github::GfellerLab/SuperCell
+    bioc::bluster
