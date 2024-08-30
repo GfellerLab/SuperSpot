@@ -9,6 +9,8 @@ SpatialDimPlotSC(
   MC,
   sc.col = NULL,
   sc.col2 = NULL,
+  col.x = "imagecol",
+  col.y = "imagerow",
   polygons_col,
   alpha = 1,
   meta_data,
@@ -24,6 +26,10 @@ SpatialDimPlotSC(
 \item{sc.col}{a character of the name of the annotation of the spots to get in the meta.data}
 
 \item{sc.col2}{a character of the name of the corresponding membership of the spots to get in the meta.data}
+
+\item{col.x}{a character of the name of the x coordinates to get from the coordinates data frame}
+
+\item{col.y}{a character of the name of the y coordinates to get from the coordinates data frame}
 
 \item{polygons_col}{a character of the name where the polygons have been stored in the MC object}
 

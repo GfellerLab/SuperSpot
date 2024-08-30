@@ -1,60 +1,27 @@
 Package: SuperSpot
-Title: Simplification of spatial transcriptomic data by merging together similar spots
+Title: Coarse Graining Spatial Transcriptomics Data Into Metaspots
 Version: 0.0.0.9000
-Author: Matei Teleman
-Maintainer: The package maintainer <matei.teleman@unil.ch>
-Description: Aggregates spatial transcriptomic data into metaspots dataset by merging together  very similar spots. 
-License: file LICENSE
+Authors@R: 
+    person("Matei", "Teleman", , "matei.teleman@unil.ch", role = c("aut", "cre"))
+Description: Bringing the metacell approach to spatial transcriptomic data by using BOTH spatial and transcriptomic information to identify metaspots.
+License: GPL-3
 Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
 Imports: 
-    igraph,
-    RANN,
-    WeightedCluster,
-    corpcor,
-    weights,
-    Hmisc,
     Matrix,
-    matrixStats,
-    plyr,
-    irlba,
-    grDevices,
-    patchwork,
-    gtools,
-    ggplot2,
-    umap,
-    entropy,
-    Rtsne,
-    dbscan,
-    cowplot,
-    scales,
-    plotfunctions,
-    proxy,
-    methods,
-    rlang,
+    RANN,
     Seurat,
-    data.table,
-    foreach,
-    doParallel,
+    SuperCell,
+    bluster,
     concaveman,
+    ggplot2,
+    igraph,
     parallelDist,
     pbapply,
-    tidyr,
-    tidyverse
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
-Suggests:
-    bluster,
-    SingleCellExperiment,
-    SummarizedExperiment,
-    BSgenome.Hsapiens.UCSC.hg38,
-    BSgenome.Hsapiens.UCSC.hg19,
-    scater,
-    knitr,
     pliman,
-    rmarkdown,
-    remotes,
-    velocyto.R
-Depends: 
-    R (>= 4.3.1)
-VignetteBuilder: knitr
-Config/testthat/edition: 3
+    plyr,
+    proxy,
+    GeneNMF,
+    progress,
+    tibble

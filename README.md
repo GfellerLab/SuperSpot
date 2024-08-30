@@ -25,10 +25,4 @@ remotes::install_github("GfellerLab/SuperSpot")
 
 ## Example
 An example vignette is available (see [example](./example.md)).
-
-## License
-SuperSpot can be used freely by academic groups for non-commercial purposes.
-The product is provided free of charge, and, therefore, on an "as is" basis, without warranty of any kind. 
-Commercial users are requested to an obtain a separate license for SuperCell. To do so, please contact Nadette Bulgin (nbulgin@lcr.org) at the Ludwig Institute for  Cancer Research Ltd.
-
-For scientific questions, please contact Matei Teleman ([matei.teleman\@unil.ch](mailto:matei.teleman@unil.ch)) or David Gfeller ([David.Gfeller\@unil.ch](mailto:David.Gfeller@unil.ch)).
+The code used to produce the figures of the application note can be found [here](./figures/).
