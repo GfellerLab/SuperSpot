@@ -49,6 +49,38 @@ supercell_metaspots_shape <- function(MC, spotpositions,annotation,concavity,mem
   return(hull_df_final)
 }
 
+supercell_metaspots_shape_v2 <- function(MC, spotpositions, annotation, concavity, membership_name = "membership") {
+  message("Creating polygons for visualization")
+
+  # Load pbapply for progress bar
+  if (!requireNamespace("pbapply", quietly = TRUE)) {
+    install.packages("pbapply")
+  }
+  library(pbapply)
+
+  unique_memberships <- unique(MC[[membership_name]])
+
+  # Use pblapply to apply function over unique memberships with progress bar
+  hull_list <- pbapply::pblapply(unique_memberships, function(memb) {
+    index.tmp <- which(MC[[membership_name]] == memb)
+    polygons.tmp <- concaveman::concaveman(as.matrix(spotpositions[index.tmp, ]), concavity = concavity)
+    index.tmp2 <- which(names(MC[[annotation]]) == memb)
+    hull_df.tmp <- data.frame(
+      x = polygons.tmp[, 2],
+      y = polygons.tmp[, 1],
+      cell_type = rep(MC[[annotation]][index.tmp2], nrow(polygons.tmp)),
+      membership = rep(memb, nrow(polygons.tmp))
+    )
+    return(hull_df.tmp)
+  })
+
+  # Combine the list of data frames into one data frame
+  hull_df_final <- do.call(rbind, hull_list)
+
+  message("Done")
+  return(hull_df_final)
+}
+
 #' Plotting metaspots on the original spots
 #'
 #' This function projects the metaspots on the original spots based on the spatial coordinates

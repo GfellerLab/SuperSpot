@@ -207,7 +207,7 @@ DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors)
 DimPlot(MC.seurat.sb, reduction = "umap",cols = distinctive_colors) -> p
 umap_sized.df <- cbind(p[[1]]$data,MC.full.spl$supercell_size[as.numeric(colnames(MC.seurat.sb))])
 colnames(umap_sized.df)[4] <- "superspot_size"
-ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.1)+ 
+ggplot(umap_sized.df) +geom_point(aes(x = umap_1, y = umap_2,size = superspot_size,fill = ident),shape = 21, stroke = 0.1,color ="lightgrey")+ 
      scale_fill_manual(values=distinctive_colors)+theme(axis.ticks.length=unit(.25, "cm"),panel.background = element_rect(fill="white"), plot.background = element_rect(fill="white"),text = element_text(size = 14),
                                                          axis.text = element_text(color="black"),
                                                          axis.title = element_text(color="black"),
@@ -323,6 +323,8 @@ benchmark.results$Peak_RAM_Used_GB <- (benchmark.results$Peak_RAM_Used_MiB)/953.
 benchmark.results$Elapsed_Time_hour <- (benchmark.results$Elapsed_Time_sec)/3600
 plot(1:25,benchmark.results$Peak_RAM_Used_GB,type = "b")
 plot(1:25,benchmark.results$Elapsed_Time_hour,type = "b")
+plot(c(1:3,3.07,4:25),c(benchmark.results.cos$Peak_RAM_Used_GB[1:3],15.76429,benchmark.results.cos$Peak_RAM_Used_GB[4:25]),type = "b")
+plot(c(1:3,3.07,4:25),c(benchmark.results.cos$Elapsed_Time_hour[1:3],0.2930806,benchmark.results.cos$Elapsed_Time_hour[4:25]),type = "b")
 ```
 
 ```{r}

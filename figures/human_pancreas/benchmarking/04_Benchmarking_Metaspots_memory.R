@@ -40,7 +40,7 @@ processing <- function(g){
   #obj <- FindVariableFeatures(obj)
   #obj <- NormalizeData(obj)
   #obj <- ScaleData(obj)
-  obj <- SCTransform(obj,assay = assay)
+  obj <- SCTransform(obj,assay = assay,return.only.var.genes = FALSE)
   MC_centroids <- read.csv(file = paste0("./SuperSpot/01_Data/PancreasCosMx/Centroids_metaspot_g",g,".csv"))
   MC_centroids <- as.matrix(MC_centroids)
   colnames(MC_centroids) <- c("x","y")

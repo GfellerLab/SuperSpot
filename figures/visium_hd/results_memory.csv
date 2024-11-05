@@ -1,0 +1,8 @@
+"","Function_Call","Elapsed_Time_sec","Total_RAM_Used_MiB","Peak_RAM_Used_MiB"
+"1","processing(64)",27.539,1.1,7224.4
+"2","processing(32)",43.221,1,12113.4
+"3","processing(16)",81.494,2,18817.8
+"4","processing(8)",182.194,4,37646.1
+"5","processing(4)",523.653,0,55716.9
+"6","processing(2)",1643.325,8,124071.3
+"7","processing(1)",5487.293,16,236340.4

@@ -2,10 +2,13 @@
 title: "Vignette SuperSpot"
 author: "Matei Teleman"
 date: "2024-01-15"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ## Import libraries
+
 ```{r}
 library(Seurat)
 library(SuperSpot)
@@ -15,7 +18,7 @@ library(tidyverse)
 library(igraph)
 ```
 
-Download files from https://zenodo.org/records/8327576. You need "well7_5raw_expression_pd.csv", "metadata.csv" and "well7_5_spatial.csv".
+Download files from <https://zenodo.org/records/8327576>. You need "well7_5raw_expression_pd.csv", "metadata.csv" and "well7_5_spatial.csv".
 
 ```{bash, eval = FALSE}
 wget https://zenodo.org/records/8327576/files/well7_5raw_expression_pd.csv
@@ -23,8 +26,8 @@ wget https://zenodo.org/records/8327576/files/metadata.csv
 wget https://zenodo.org/records/8327576/files/well7_5_spatial.csv
 ```
 
-
 ## Import dataset
+
 ```{r}
 well7.mtx <- read_csv("./well7_5raw_expression_pd.csv") %>% column_to_rownames("GENE") %>% as.sparse()
 well7.mtx[1:5,1:5]
@@ -46,8 +49,9 @@ spotPosition$Y <- as.numeric(spotPosition$Y)
 ```
 
 ## Create metaspot object
-The function "SCimplify_SpatialDLS" uses the raw count matrix and the spatial coordinates of the spots to build the metaspots. You can choose to split or not the the connections between the spots that have a higher distance compared to the other ones with "split_not_connected". You can also split the metaspots based on a provided annotation with "cell.annotation" parameter (i.e.,metaspots containing spots from different cell types/regions will be split resulting in one metaspot for each cell type/region).
-The main output here is the membership given to each spot to know in which metaspot it is assigned.
+
+The function "SCimplify_SpatialDLS" uses the raw count matrix and the spatial coordinates of the spots to build the metaspots. You can choose to split or not the the connections between the spots that have a higher distance compared to the other ones with "split_not_connected". You can also split the metaspots based on a provided annotation with "cell.annotation" parameter (i.e.,metaspots containing spots from different cell types/regions will be split resulting in one metaspot for each cell type/region). The main output here is the membership given to each spot to know in which metaspot it is assigned.
+
 ```{r}
 g = 10 # gamma
 n.pc = 1:5 # number of first PC to use
@@ -75,6 +79,7 @@ well7.md[,str_c("MC_membership_",g)] <- MC.well7$membership %>% as.character()
 ```
 
 The major quality control for metaspots is purity (proportion of the most abundant cell type/region within each metaspot). In the case where we decided to split the metaspots with the paramater "cell.annotation", the purity should be equal to 1.
+
 ```{r}
 #We compute the purity for each metaspot
 method_purity <- c("max_proportion", "entropy")[1]
@@ -94,8 +99,9 @@ MC.well7$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Main_m
 ```
 
 SuperSpot come with its own way to visualize the metapots. The function "supercell_metaspots_shape" first builds the polygons representing the metaspots covering the original spots.
+
 ```{r,fig.height=20, fig.width=20}
-MC.well7$polygons <- supercell_metaspots_shape(MC = MC.well7,
+MC.well7$polygons <- supercell_metaspots_shape_v2(MC = MC.well7,
                                                    spotpositions = spotPosition,
                                                    annotation = "Main_molecular_cell_type",
                                                    concavity = 2,
@@ -115,6 +121,7 @@ SpatialDimPlotSC(original_coord = spotPosition,
 ```
 
 Because we wanted that every metaspot contains only one cell type and we split them, it created metaspots with gaps. To overcome this, we split them again based on if they are still connected or not in the KNN.
+
 ```{r,fig.height=20, fig.width=20}
 MC.well7.spl <- split_unconnected(MC.well7)
 well7.md[,str_c("MC_membership_spl_",g)] <- MC.well7.spl$membership %>%
@@ -124,7 +131,7 @@ MC.well7.spl$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Ma
                                                               supercell_membership = MC.well7.spl$membership,
                                                               method = "absolute")
 
-MC.well7.spl$polygons <- supercell_metaspots_shape(MC = MC.well7.spl,
+MC.well7.spl$polygons <- supercell_metaspots_shape_v2(MC = MC.well7.spl,
                                                        spotpositions = spotPosition,
                                                        annotation = "Main_molecular_cell_type",
                                                        concavity = 2,membership_name = "membership")
@@ -143,7 +150,9 @@ SpatialDimPlotSC(original_coord = spotPosition,
 ```
 
 ## Computing Metaspots without threshold on the KNN
+
 We set the percentage to keep at 1:
+
 ```{r,fig.height=20, fig.width=20}
 g = 10 # gamma
 n.pc = 1:5 # number of first PC to use
@@ -179,7 +188,7 @@ MC.well7_no_tresh.spl$Main_molecular_cell_type <- supercell_assign(clusters = we
                                                               supercell_membership = MC.well7_no_tresh.spl$membership,
                                                               method = "absolute")
 
-MC.well7_no_tresh.spl$polygons <- supercell_metaspots_shape(MC = MC.well7_no_tresh.spl,
+MC.well7_no_tresh.spl$polygons <- supercell_metaspots_shape_v2(MC = MC.well7_no_tresh.spl,
                                                        spotpositions = spotPosition,
                                                        annotation = "Main_molecular_cell_type",
                                                        concavity = 2,membership_name = "membership")
@@ -196,11 +205,73 @@ SpatialDimPlotSC(original_coord = spotPosition,
   theme_minimal()+
   NoLegend()
 ```
+
 With the exact same parameters as for cell types, we can clearly observe the differences with the sparse regions of the tissue.
 
 
+## Computing Metaspots with fixed distance instead of percentage
+
+We set the distance at 100:
+
+```{r,fig.height=20, fig.width=20}
+g = 10 # gamma
+n.pc = 1:5 # number of first PC to use
+k.knn = 15 # number of neighbors to connect to each spot
+dist.trhesh = 125 # percentage of connections to keep
+
+print("Creating metaspots")
+# By default, SCimplify_SpatialDLS computes distances in a parallalized way. By default, all the available cpus are used. If your computer doesn't support, you can change the number of cpus with the paramater "n.cpu"
+MC.well7_dist <- SCimplify_SpatialDLS_v2(X = well7.mtx ,
+                                     spotPositions = spotPosition ,
+                                     col.x = "X",
+                                     col.y = "Y",
+                                     method_similarity = "1",
+                                     split_not_connected = TRUE,
+                                     method_reduction = "PCA",
+                                     gamma = g,
+                                     n.dim = n.pc,
+                                     method_knn = "1",
+                                     k.knn = k.knn,
+                                     dist.thresh = dist.trhesh,
+                                     method_normalization = "log_normalize",
+                                     cell.annotation = well7.md$Main_molecular_cell_type,)
+
+print("Done")
+
+well7.md[,str_c("MC_membership_dist_",g)] <- MC.well7_dist$membership %>% as.character()
+
+MC.well7_dist.spl <- split_unconnected(MC.well7_dist)
+well7.md[,str_c("MC_membership_dist_spl_",g)] <- MC.well7_dist.spl$membership %>%
+  as.character()
+
+MC.well7_dist.spl$Main_molecular_cell_type <- supercell_assign(clusters = well7.md$Main_molecular_cell_type,
+                                                              supercell_membership = MC.well7_dist.spl$membership,
+                                                              method = "absolute")
+
+MC.well7_dist.spl$polygons <- supercell_metaspots_shape_v2(MC = MC.well7_dist.spl,
+                                                       spotpositions = spotPosition,
+                                                       annotation = "Main_molecular_cell_type",
+                                                       concavity = 2,membership_name = "membership")
+
+SpatialDimPlotSC(original_coord = spotPosition,
+                 col.x = "Y",
+                 col.y = "X",
+                 MC = MC.well7_dist.spl,
+                 sc.col = "Main_molecular_cell_type",
+                 sc.col2 = str_c("MC_membership_dist_spl_",g),
+                 polygons_col = "polygons",
+                 meta_data = well7.md)+
+  coord_fixed()+
+  theme_minimal()+
+  NoLegend()
+```
+
+With the exact same parameters as for cell types, we can clearly observe the differences with the sparse regions of the tissue.
+
 ## Create Seurat object from metaspot object
+
 As normalization is a matter of debate for spatial transcriptomics data, we use here Log Normalization. But SuperSpot offers also using SCT and using raw counts.
+
 ```{r,fig.height=20, fig.width=20}
 MC_centroids <- supercell_spatial_centroids(MC.well7.spl,spotPositions = spotPosition)
 
@@ -230,6 +301,7 @@ DimPlot(MC.seurat, reduction = "umap", group.by = "Main_molecular_cell_type")
 ```
 
 ## Perform downstream analyses
+
 ```{r,fig.height=20, fig.width=20}
 Idents(MC.seurat) <- "Main_molecular_cell_type" 
 levels(MC.seurat) <- sort(levels(MC.seurat))
