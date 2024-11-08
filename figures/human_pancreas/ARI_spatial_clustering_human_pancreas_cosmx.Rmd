@@ -1,0 +1,534 @@
+---
+title: "Untitled"
+author: "Matei Teleman"
+date: "2024-07-30"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(SuperSpot)
+library(SuperCell)
+library(tidyr)
+library(tidyverse)
+library(igraph)
+library(Banksy)
+```
+
+## Spot
+
+### CellCharter
+
+```{r}
+reticulate::use_miniconda("./miniconda3/envs/cellcharter-env")
+```
+
+
+```{python}
+import anndata as ad
+import squidpy as sq
+import cellcharter as cc
+import pandas as pd
+import scanpy as sc
+import scvi
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+seed_values = [random.randint(1, 10000) for _ in range(10)]
+
+
+adata = sq.read.nanostring(
+    path="./data/PancreasCosMx",
+    counts_file="Pancreas_exprMat_file.csv",
+    meta_file="Pancreas_metadata_file.csv",
+    #fov_file="Pancreas_fov_positions_file.csv",
+)
+adata.var_names_make_unique()
+adata
+
+# Remove negative probes
+adata = adata[:, [c for c in adata.var_names if 'NegPrb' not in c]].copy()
+    
+adata.obs['sample'] = "pancreas"
+
+
+```
+
+```{python}
+
+adata.obs['sample'] = pd.Categorical(adata.obs['sample'])
+#adata.uns['spatial'] = pd.Categorical(adata.uns['spatial'])
+adata
+```
+
+```{python}
+sc.pp.filter_genes(adata, min_counts=3)
+adata
+adata.layers["counts"] = adata.X.copy()
+
+sc.pp.normalize_total(adata, target_sum=1e6)
+sc.pp.log1p(adata)
+
+adata
+```
+
+```{python}
+for i in range (0,10):
+  scvi.settings.seed = seed_values[i]
+  scvi.model.SCVI.setup_anndata(
+    adata, 
+    layer="counts", 
+    batch_key='sample'
+  )
+
+  model = scvi.model.SCVI(adata)
+  model.train(early_stopping=True, enable_progress_bar=True)
+
+  adata.obsm['X_scVI'] = model.get_latent_representation(adata).astype(np.float32)
+
+  sq.gr.spatial_neighbors(adata, library_key='sample', coord_type='generic', delaunay=True, spatial_key='spatial')
+  cc.gr.remove_long_links(adata)
+
+  cc.gr.aggregate_neighbors(adata, n_layers=3, use_rep='X_scVI', out_key='X_cellcharter', sample_key='sample')
+
+
+
+  autok = cc.tl.ClusterAutoK(
+     n_clusters=(2,10), 
+      max_runs=10, 
+      model_params=dict(
+          random_state=seed_values[i]
+          # If running on GPU
+          #trainer_params=dict(accelerator='gpu', devices=1)
+      )
+  )
+
+  autok.fit(adata, use_rep='X_cellcharter')
+
+  #plt.close()
+  #cc.pl.autok_stability(autok)
+  #plt.show()
+  #plt.close()
+  adata.obs['cluster_cellcharter'] = autok.predict(adata, use_rep='X_cellcharter')
+
+  # sq.pl.spatial_scatter(
+  #     adata, 
+  #     color=['cluster_cellcharter'], 
+  #     library_key='sample',  
+  #     size=1, 
+  #     img=None,
+  #     spatial_key='spatial',
+  #     palette='Set2',
+  #     #connectivity_key='spatial_connectivities',
+  #     #img_alpha=0.3,
+  #     figsize=(15,15),
+  #     ncols=1,
+  #     #library_id=adata.obs['sample'].unique(),
+  #     library_id=['pancreas'],
+  # )
+
+  #plt.show()
+  #plt.close()
+  adata.obs['cluster_cellcharter'].to_excel(f"./SuperSpot/reviews/ARI_scores/spot/cellcharter_clustering_{i}.xlsx")
+
+```
+### Banksy
+```{r}
+panc <- readRDS("./data/PancreasCosMx/Seurat_Pancreas_withTranscripts.rds")
+pattern_to_exclude <- "Negative[0-9]+|SystemControl[0-9]+"
+mtx <- read_csv("./data/PancreasCosMx/Pancreas_exprMat_file.csv")
+columns_to_keep <- grep(pattern_to_exclude, colnames(mtx), invert = TRUE, value = TRUE)
+mtx <- mtx[, columns_to_keep]
+mtx.flt <- mtx[,3:ncol(mtx)] %>% t() %>% as.sparse()
+metad <- read_csv("./data/PancreasCosMx/Pancreas_metadata_file.csv")
+metad <- column_to_rownames(metad,"cell_id")
+meta <- readRDS("./data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+metad$cell_type <- meta[rownames(metad), "cell_types"]
+metad$cell_type[is.na(metad$cell_type)] <- "QC_dropped"
+colnames(mtx.flt) <- rownames(metad)
+spotPosition <- GetTissueCoordinates(panc)[,c("x","y")]
+colnames(spotPosition) <- c("imagerow","imagecol")
+rm(panc)
+rm(meta)
+options(future.globals.maxSize = 8000 * 1024^2)
+```
+
+```{r}
+nano.obj <- LoadNanostring(data.dir = "./data/PancreasCosMx", fov = "pancreas")
+
+# add in precomputed annotations
+meta <- readRDS("./PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+meta$new_cell_ID <- sub("c_1_(\\d+)_(\\d+)", "\\2_\\1", meta$cell_ID)
+rownames(meta) <- meta$new_cell_ID
+nano.obj@meta.data$types <- meta[rownames(nano.obj@meta.data), "cell_types"]
+nano.obj@meta.data$types[is.na(nano.obj@meta.data$types)] <- "QC_dropped"
+Idents(nano.obj) <- nano.obj$types
+# set to avoid error exceeding max allowed size of globals
+options(future.globals.maxSize = 8000 * 1024^2)
+
+nano.obj.sb <- subset(nano.obj, features = rownames(nano.obj)[grepl("Negative[0-9]+|SystemControl[0-9]+", rownames(nano.obj), ignore.case ="True") == FALSE], types != "QC_dropped")
+rm(nano.obj)
+nano.obj.sb <- NormalizeData(nano.obj.sb, verbose = T, assay = "Nanostring")
+nano.obj.sb <- ScaleData(nano.obj.sb, verbose = T,assay = "Nanostring")
+nano.obj.sb <- FindVariableFeatures(nano.obj.sb, verbose = T,assay = "Nanostring")
+
+nano.obj.sb <- SeuratWrappers::RunBanksy(nano.obj.sb,
+  lambda = 0.8, verbose = TRUE,
+  assay = "Nanostring", slot = "data",
+  k_geom = 50
+)
+
+DefaultAssay(nano.obj.sb) <- "BANKSY"
+nano.obj.sb <- RunPCA(nano.obj.sb, assay = "BANKSY", reduction.name = "pca.banksy", features = rownames(nano.obj.sb), npcs = 30)
+nano.obj.sb <- FindNeighbors(nano.obj.sb, reduction = "pca.banksy", dims = 1:30)
+nano.obj.sb <- FindClusters(nano.obj.sb, cluster.name = "banksy_cluster", resolution = 0.5)
+saveRDS(nano.obj.sb$banksy_cluster,".SuperSpot/reviews/ARI_scores/spot/BANKSY_clustering.rds")
+rm(nano.obj.sb)
+```
+
+
+## Metaspot
+
+```{r}
+g = 25 # gamma
+n.pc = 1:30 # number of first PC to use
+k.knn = 16 # number of neighbors to connect to each spot
+
+print("Creating metaspots")
+MC.spl <- SCimplify_SpatialDLS(X = mtx.flt,
+                               spotPositions = spotPosition ,
+                               method_similarity = "1",
+                               split_not_connected = T,
+                               genes.use = NULL,
+                               gamma = g,
+                               n.pc = n.pc,
+                               method_knn = "1",
+                               k.knn = k.knn,
+                               method_normalization = "SCT",
+                               cell.annotation = metad$cell_type,
+                               return.seurat.object = TRUE)
+
+print("Done")
+
+metad[,str_c("MC_membership_",g)] <- MC.spl$membership %>% as.character()
+```
+
+```{r}
+MC.full.spl <- split_unconnected(MC.spl)
+metad[,str_c("MC_membership_spl_",g)] <- MC.full.spl$membership %>%
+  as.character()
+
+MC.full.spl$cell_type <- supercell_assign(clusters = metad$cell_type,
+                                                              supercell_membership = MC.full.spl$membership,
+                                                              method = "absolute")
+
+MC.full.spl$polygons <- supercell_metaspots_shape(MC = MC.full.spl,
+                                                       spotpositions = spotPosition,
+                                                       annotation = "cell_type",
+                                                       concavity = 2,membership_name = "membership")
+
+SpatialDimPlotSC(original_coord = spotPosition,
+                 MC = MC.full.spl,
+                 sc.col = "cell_type",
+                 sc.col2 = str_c("MC_membership_spl_",g),
+                 polygons_col = "polygons",
+                 meta_data = metad,alpha_hull = 0.5)+
+  theme(panel.background = element_rect(fill="white"),
+        plot.background = element_rect(fill="white"),
+        panel.grid = element_line(color="white"),
+        axis.text = element_text(color="black"),
+        axis.title = element_text(color="black"),
+        legend.background = element_rect(fill="black"),
+        legend.text = element_text(color="black"))+NoLegend()+coord_fixed()
+
+MC.full.spl$effect.gamma
+rm(MC.spl)
+write.csv(metad,"./data/metad_with_membership.csv")
+```
+
+```{r}
+MC_centroids <- supercell_spatial_centroids(MC.full.spl,spotPositions = spotPosition)
+
+MC.ge <- superspot_GE(MC = MC.full.spl,
+  ge = mtx.flt %>% as.matrix(),
+  groups = as.numeric(MC.full.spl$membership),
+  mode = "sum"
+)
+saveRDS(MC.ge,paste0("./data/PancreasCosMx/GE_metaspot_split_g",g,".rds"))
+```
+
+```{r}
+metadata  <- read.csv("./data/PancreasCosMx/Pancreas_metadata_file.csv")
+  MC_centroids <- supercell_spatial_centroids(MC.full.spl,spotPositions = spotPosition)
+  #metadata$cell <- paste(metadata$cell_ID,metadata$fov, sep = "_")
+  
+  metadata_filt <- metadata[metadata$cell_id  %in% (names(MC.full.spl$membership)) == T,]
+  
+  metadata_filt$membership <- MC.full.spl$membership
+  
+  rownames(metadata_filt) <- NULL
+  metadata_filt <- metadata_filt %>% column_to_rownames("cell")
+  
+  #metadata_mean <- stats::aggregate(metadata_filt %>% as.matrix() ~membership,metadata_filt,mean)
+  
+  metadata_mean <- stats::aggregate(subset(metadata_filt,select = -c(cell_id,version,Run_name,Run_Tissue_name,tissue,Panel,assay_type)) %>% as.matrix() ~membership,metadata_filt,mean)
+  
+  metadata_mean$fov <- as.integer(metadata_mean$fov)
+  
+  metadata_mean$cell_ID <- metadata_mean$membership
+  
+  
+  write_csv(x=MC_centroids[,c("imagecol","imagerow")],file = paste0("./data/PancreasCosMx/Centroids_metaspot_split_g",g,".csv"))
+  write_csv(x=metadata_mean,file = paste0("./data/PancreasCosMx/Pancreas_metaspot_split_g",g,".csv"))
+  
+  counts.matrix_ms <- t(MC.ge %>% as.matrix()) %>% as.data.frame() %>% rownames_to_column("cell_ID")
+  
+  counts.matrix_ms$fov <- metadata_mean$fov
+  
+  counts.matrix_ms <- counts.matrix_ms[columns_to_keep]
+  
+  write_csv(x=counts.matrix_ms,file = paste0("./data/PancreasCosMx/count_ms_split_g",g,".csv"))
+  
+
+
+write.csv(metad,"./data/metad.csv")
+```
+
+
+### CellCharter
+
+```{r}
+reticulate::use_miniconda("./miniconda3/envs/cellcharter-env")
+```
+
+
+```{python}
+import anndata as ad
+import squidpy as sq
+import cellcharter as cc
+import pandas as pd
+import scanpy as sc
+import scvi
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+seed_values = [random.randint(1, 10000) for _ in range(10)]
+adata_metaspot = sq.read.nanostring(
+    path="./data/PancreasCosMx",
+    counts_file="count_ms_split_g25.csv",
+    meta_file="Pancreas_metaspot_split_g25.csv",
+    #fov_file="Pancreas_fov_positions_file.csv",
+)
+adata_metaspot.var_names_make_unique()
+
+#metaspot_position = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspots_positions.csv")
+
+#adata_metaspot.obsm['spatial'] = metaspot_position
+
+
+# Load the spatial coordinates
+#spatial_coords = pd.read_csv("/Users/admin/Documents/These/Output/SC_DLS/Benchmarking_Mouse_Cortex_v2/metaspot_tissue_positions_list.csv", header=None, index_col=0)
+
+# Assuming 'adata_metaspot' is your AnnData object with the count matrix
+# Make sure that the index of spatial_coords matches the order of the barcodes in adata_metaspot.obs_names
+#adata_metaspot.obsm['spatial'] = spatial_coords.loc[adata_metaspot.obs_names, [4, 5]].to_numpy()
+#adata_metaspot.obsm['spatial'] = spatial_coords.loc[:, [4, 5]].to_numpy()
+
+# Flip y axis
+#adata_metaspot.obsm['spatial_fov'][:, 1] = np.max(adata_metaspot.obsm['spatial_fov'][:, 1]) - adata_metaspot.obsm['spatial_fov'][:, 1]
+
+# Remove negative probes
+adata_metaspot = adata_metaspot[:, [c for c in adata_metaspot.var_names if 'NegPrb' not in c]].copy()
+    
+adata_metaspot.obs['sample'] = "pancreas"
+
+
+```
+
+```{python}
+
+# 'spatial_fov' refers to global coordinates of the cells.
+# Thus, we are going to use 'spatial_fov' and not 'spatial' as spatial coordinates.
+#adata_metaspot.uns['spatial_fov'] = {s: {} for s in adata_metaspot.obs['sample'].unique()}
+adata_metaspot.obs['sample'] = pd.Categorical(adata_metaspot.obs['sample'])
+#adata_metaspot.uns['spatial'] = pd.Categorical(adata_metaspot.uns['spatial'])
+adata_metaspot
+```
+
+```{python}
+sc.pp.filter_genes(adata_metaspot, min_counts=3)
+adata_metaspot
+#sc.pp.filter_cells(adata_metaspot, min_counts=3)
+#adata_metaspot
+adata_metaspot.layers["counts"] = adata_metaspot.X.copy()
+
+sc.pp.normalize_total(adata_metaspot, target_sum=1e6)
+sc.pp.log1p(adata_metaspot)
+
+adata_metaspot
+```
+
+```{python}
+for i in range(0,10):
+  scvi.settings.seed = seed_values[i]
+  scvi.model.SCVI.setup_anndata(
+    adata_metaspot, 
+    layer="counts", 
+    batch_key='sample')
+
+  model = scvi.model.SCVI(adata_metaspot)
+  model.train(early_stopping=True, enable_progress_bar=True)
+
+  adata_metaspot.obsm['X_scVI'] = model.get_latent_representation(adata_metaspot).astype(np.float32)
+  sq.gr.spatial_neighbors(adata_metaspot, library_key='sample', coord_type='generic', delaunay=True, spatial_key='spatial')
+  cc.gr.remove_long_links(adata_metaspot)
+
+
+  cc.gr.aggregate_neighbors(adata_metaspot, n_layers=3, use_rep='X_scVI', out_key='X_cellcharter', sample_key='sample')
+
+  autok = cc.tl.ClusterAutoK(
+      n_clusters=(2,10), 
+      max_runs=10, 
+      model_params=dict(
+         random_state=seed_values[i]
+        # If running on GPU
+        #trainer_params=dict(accelerator='gpu', devices=1)
+      )
+  )
+
+  autok.fit(adata_metaspot, use_rep='X_cellcharter')
+
+  #plt.close()
+  #cc.pl.autok_stability(autok)
+  #plt.show()
+  #plt.close()
+
+  adata_metaspot.obs['cluster_cellcharter'] = autok.predict(adata_metaspot, use_rep='X_cellcharter')
+
+  #sq.pl.spatial_scatter(
+  #    adata_metaspot, 
+  #    color=['cluster_cellcharter'], 
+  #    library_key='sample',  
+  #    size=1, 
+  #    img=None,
+  #    spatial_key='spatial',
+  #    palette='Set2',
+  #    #connectivity_key='spatial_connectivities',
+  #    #img_alpha=0.3,
+  #    figsize=(15,15),
+  #    ncols=1,
+  #    #library_id=adata_metaspot.obs['sample'].unique(),
+  #    library_id=['pancreas'],
+  #)
+
+  #plt.show()
+#plt.close()
+  adata_metaspot.obs['cluster_cellcharter'].to_excel(f"./SuperSpot/reviews/ARI_scores/metaspot/cellcharter_clustering_metaspot_{i}.xlsx")
+
+```
+
+
+### Banksy
+```{r}
+MC.ge<-readRDS(paste0("./data/PancreasCosMx/GE_metaspot_split_g",25,".rds"))
+MC_centroids<-read_csv(paste0("./data/PancreasCosMx/Centroids_metaspot_split_g",25,".csv"))
+```
+
+```{r}
+
+library(SummarizedExperiment)
+library(SpatialExperiment)
+library(scuttle)
+
+library(scater)
+library(cowplot)
+se_ms <- SpatialExperiment(assay = list(counts = MC.ge), spatialCoords = as.matrix(MC_centroids))
+
+# QC based on total counts
+#qcstats <- perCellQCMetrics(se)
+#thres <- quantile(qcstats$total, c(0.05, 0.98))
+#keep <- (qcstats$total > thres[1]) & (qcstats$total < thres[2])
+#se <- se[, keep]
+
+# Normalization to mean library size
+se_ms <- computeLibraryFactors(se_ms)
+aname <- "normcounts"
+assay(se_ms, aname) <- normalizeCounts(se_ms, log = FALSE)
+
+lambda <- c(0.8)
+k_geom <- c(50)
+
+se_ms <- Banksy::computeBanksy(se_ms, assay_name = aname, compute_agf = TRUE, k_geom = k_geom)
+set.seed(1000)
+se_ms <- Banksy::runBanksyPCA(se_ms, use_agf = TRUE, lambda = lambda)
+se_ms <- Banksy::runBanksyUMAP(se_ms, use_agf = TRUE, lambda = lambda)
+se_ms <- Banksy::clusterBanksy(se_ms, use_agf = TRUE, lambda = lambda, resolution = 0.5,)
+saveRDS(colData(se_ms)[,"clust_M1_lam0.8_k50_res0.5", drop = F],"./SuperSpot/reviews/ARI_scores/metaspot/BANKSY_clustering.rds")
+```
+
+
+## Computing ARI
+```{r}
+nano.obj <- LoadNanostring(data.dir = "./data/PancreasCosMx", fov = "pancreas")
+
+# add in precomputed annotations
+meta <- readRDS("./data/PancreasCosMx/CellType_Accessory_Data/Pancreas_celltype_InSituType.rds")
+meta$new_cell_ID <- sub("c_1_(\\d+)_(\\d+)", "\\2_\\1", meta$cell_ID)
+rownames(meta) <- meta$new_cell_ID
+nano.obj@meta.data$types <- meta[rownames(nano.obj@meta.data), "cell_types"]
+nano.obj@meta.data$types[is.na(nano.obj@meta.data$types)] <- "QC_dropped"
+Idents(nano.obj) <- nano.obj$types
+```
+
+```{r}
+cellcharter_results_spots <- list.files(path = "./SuperSpot/reviews/ARI_scores/spot", pattern = "cellcharter", full.names = TRUE)
+cellcharter_results_metaspots <- list.files(path = "./SuperSpot/reviews/ARI_scores/metaspot", pattern = "cellcharter", full.names = TRUE)
+```
+
+```{r}
+ari_spots <- c()
+for ( i in 1:10 ){
+  clusts_cc <- readxl::read_xlsx(cellcharter_results_spots[i]) %>% column_to_rownames("...1")
+  ari.tmp <- aricode::ARI(nano.obj$types,clusts_cc$cluster_cellcharter)
+  ari_spots <- c(ari_spots,ari.tmp)
+  nano.obj@meta.data$CellCharter_clustering_spots <- clusts_cc$cluster_cellcharter
+  plot(ImageDimPlot(nano.obj, group.by = "CellCharter_clustering_spots"))
+}
+```
+
+```{r}
+med_tmp <- read_csv("./data/metad_with_membership.csv") %>% column_to_rownames("...1")
+med_tmp$new_cell_id <- paste(med_tmp$cell_ID,med_tmp$fov,sep = "_")
+
+cellcharter_mapping_df <- data.frame(matrix(ncol = 0, nrow = 48944))
+
+for (cl in cellcharter_results_metaspots){
+  cellcharter_clustering_metaspot <- readxl::read_xlsx(cl)
+  cellcharter_clustering_metaspot$MC_membership_spl_25 <- 1:nrow(cellcharter_clustering_metaspot)
+  mapping_ms_cellcharter <- merge(cellcharter_clustering_metaspot[,c("cluster_cellcharter","MC_membership_spl_25")],med_tmp[,c("new_cell_id" ,"MC_membership_spl_25")])
+  mapping_ms_cellcharter <- mapping_ms_cellcharter[match(rownames(nano.obj@meta.data),mapping_ms_cellcharter$new_cell_id),]
+  cellcharter_mapping_df <- cbind(cellcharter_mapping_df,mapping_ms_cellcharter$cluster_cellcharter)
+  nano.obj@meta.data$CellCharter_clustering <- mapping_ms_cellcharter$cluster_cellcharter
+  plot(ImageDimPlot(nano.obj, group.by = "CellCharter_clustering"))
+}
+rownames(cellcharter_mapping_df) <- rownames(nano.obj@meta.data)
+
+
+ari_metaspots <- c()
+for (cl in 1:10) {
+  ari.tmp <- aricode::ARI(nano.obj$types,cellcharter_mapping_df[,cl])
+  ari_metaspots <- c(ari_metaspots,ari.tmp)
+}
+
+ari.df <- tibble(ARI_spots = ari_spots, ARI_metaspots = ari_metaspots)
+boxplot(ari.df,col = scales::hue_pal()(2))
+ggplot(tibble(ARI = c(mean(ari_spots),mean(ari_metaspots)),Condition = c("spot","metaspot")) %>% dplyr::mutate(Condition = factor(Condition, levels = c("spot","metaspot"))),aes(x = Condition ,y = ARI, fill = Condition))+geom_bar(stat="identity")+
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          text = element_text(size = 20),
+          legend.position = "top")
+```
+

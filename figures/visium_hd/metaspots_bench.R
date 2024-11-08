@@ -7,13 +7,11 @@ library(igraph)
 library(arrow)
 library(BPCells)
 
-spotPositions <- arrow::read_parquet("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet") %>% column_to_rownames("barcode")
+spotPositions <- arrow::read_parquet("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet") %>% column_to_rownames("barcode")
 spotPositions.filt <- subset(spotPositions, in_tissue == 1)
 rm(spotPositions)
-#mtx.count <- Seurat::Read10X_h5("/Users/admin/Downloads/square_008um/filtered_feature_bc_matrix.h5")
-mtx.count <- Seurat::Read10X_h5("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5")
-#mtx.count <- open_matrix_10x_hdf5("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5", feature_type="Gene Expression") %>%
-  #write_matrix_dir("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix_raw")
+mtx.count <- Seurat::Read10X_h5("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5")
+
 spotPositions.filt <- spotPositions.filt[colnames(mtx.count),c("pxl_col_in_fullres","pxl_row_in_fullres")]
 colnames(spotPositions.filt) <- c("imagecol","imagerow")
 
@@ -385,7 +383,7 @@ MC.spl$polygons <- supercell_metaspots_shape_v2(MC = MC.spl,
                                                        annotation = "cell_type",
                                                        concavity = 2,membership_name = "membership")
 MC.spl$centroids <- supercell_spatial_centroids(MC = MC.spl,spotPositions = spotPositions.filt)
-saveRDS(MC.spl,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g16_fg.rds")
+saveRDS(MC.spl,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g16_fg.rds")
 
 MC.fs.ge <- superspot_GE(MC = MC.spl,
                          ge = mtx.count, #%>% as.matrix(),
@@ -408,17 +406,17 @@ MC.fs.seurat <- RunPCA(MC.fs.seurat)
 MC.fs.seurat <- FindNeighbors(MC.fs.seurat)
 MC.fs.seurat <- FindClusters(MC.fs.seurat,resolution = 0.5)
 MC.fs.seurat <- RunUMAP(MC.fs.seurat,dims = 1:30)
-jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_16.jpeg"),width = 1920,height = 1080)
+jpeg(file=paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_16.jpeg"),width = 1920,height = 1080)
 plot(DimPlot(MC.fs.seurat))
 dev.off()
-#saveRDS(MC.fs.seurat,"/Users/admin/Downloads/square_008um/MC_fs_seurat.rds")
-saveRDS(MC.fs.seurat,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_seurat_g16_fg.rds")
+#saveRDS(MC.fs.seurat,"./square_008um/MC_fs_seurat.rds")
+saveRDS(MC.fs.seurat,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_seurat_g16_fg.rds")
 pca_embeddings_mc <- Embeddings(MC.fs.seurat, "pca")
 
-# if (!file.exists("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")) {
-# MC.fs.ge %>% write_matrix_dir("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")
+# if (!file.exists("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")) {
+# MC.fs.ge %>% write_matrix_dir("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")
 # } else {
-#   MC.fs.ge <- open_matrix_dir("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")
+#   MC.fs.ge <- open_matrix_dir("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_ge_raw")
 # }
 #
 # print( "Normalize by reads-per-cell")
@@ -460,7 +458,7 @@ pca_embeddings_mc <- Embeddings(MC.fs.seurat, "pca")
 #   cluster_graph_louvain() # Perform graph-based clustering
 # cat(sprintf("Clusts length: %s\n", length(clusts)))
 # clusts[1:10]
-# jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_9.jpeg"),width = 1920,height = 1080)
+# jpeg(file=paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_9.jpeg"),width = 1920,height = 1080)
 # plot(plot_embedding(clusts, umap))
 # dev.off()
 # mc_bpc <- list(raw.couts = MC.fs.ge,
@@ -468,13 +466,13 @@ pca_embeddings_mc <- Embeddings(MC.fs.seurat, "pca")
 #                pca = pca_embeddings_mc,
 #                umap = umap,
 #                clusts = clusts)
-# saveRDS(mc_bpc,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_bpc_g16_fg.rds")
+# saveRDS(mc_bpc,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_bpc_g16_fg.rds")
 
 # Extract the cluster assignments (assuming clustering is already done)
 clusters_mc <- Idents(MC.fs.seurat)
 #clusters_mc <- clusts
 
-so_8 <- Seurat::Load10X_Spatial("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_008um")
+so_8 <- Seurat::Load10X_Spatial("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_008um")
 so_8 <- SetAssayData(so_8, layer = "data", GetAssayData(so_8,layer = "counts"))
 so_8 <- FindVariableFeatures(so_8)
 so_8 <- ScaleData(so_8,do.scale = F,do.center = F)
@@ -482,10 +480,10 @@ so_8 <- RunPCA(so_8)
 so_8 <- FindNeighbors(so_8)
 so_8 <- FindClusters(so_8,resolution = 0.5)
 so_8 <- RunUMAP(so_8,dims = 1:30)
-jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_vis_8.jpeg"),width = 1920,height = 1080,quality = 100)
+jpeg(file=paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_vis_8.jpeg"),width = 1920,height = 1080,quality = 100)
 plot(DimPlot(so_8))
 dev.off()
-saveRDS(so_8,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/so_8.rds")
+saveRDS(so_8,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/so_8.rds")
 pca_embeddings_8 <- Embeddings(so_8, "pca")
 
 # Extract the cluster assignments (assuming clustering is already done)
@@ -513,7 +511,7 @@ for (i in 1:num_batches) {
 avg_silhouette_score_mc <- mean(silhouette_scores_mc)
 
 print(paste("Average Silhouette Score:", avg_silhouette_score_mc))
-saveRDS(avg_silhouette_score_mc,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_g16_fg.rds")
+saveRDS(avg_silhouette_score_mc,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_g16_fg.rds")
 
 set.seed(42)  # For reproducibility
 
@@ -533,7 +531,7 @@ for (i in 1:num_batches) {
 avg_silhouette_score_8 <- mean(silhouette_scores_8)
 
 print(paste("Average Silhouette Score:", avg_silhouette_score_8))
-saveRDS(avg_silhouette_score_mc,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_8um_fg.rds")
+saveRDS(avg_silhouette_score_mc,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_8um_fg.rds")
 rm(so_8)
 
 g = 64 # gamma
@@ -564,7 +562,7 @@ MC.spl$polygons <- supercell_metaspots_shape_v2(MC = MC.spl,
                                                        annotation = "cell_type",
                                                        concavity = 2,membership_name = "membership")
 MC.spl$centroids <- supercell_spatial_centroids(MC = MC.spl,spotPositions = spotPositions.filt)
-saveRDS(MC.spl,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g64_fg.rds")
+saveRDS(MC.spl,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g64_fg.rds")
 
 MC.fs.ge <- superspot_GE(MC = MC.spl,
                          ge = mtx.count, #%>% as.matrix(),
@@ -585,17 +583,17 @@ MC.fs.seurat <- RunPCA(MC.fs.seurat)
 MC.fs.seurat <- FindNeighbors(MC.fs.seurat)
 MC.fs.seurat <- FindClusters(MC.fs.seurat,resolution = 0.5)
 MC.fs.seurat <- RunUMAP(MC.fs.seurat,dims = 1:30)
-jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_64.jpeg"),width = 1920,height = 1080)
+jpeg(file=paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_mc_64.jpeg"),width = 1920,height = 1080)
 plot(DimPlot(MC.fs.seurat))
 dev.off()
-#saveRDS(MC.fs.seurat,"/Users/admin/Downloads/square_0016um/MC_fs_seurat.rds")
-saveRDS(MC.fs.seurat,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_seurat_g64_fg.rds")
+#saveRDS(MC.fs.seurat,"./square_0016um/MC_fs_seurat.rds")
+saveRDS(MC.fs.seurat,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_fs_seurat_g64_fg.rds")
 pca_embeddings_mc <- Embeddings(MC.fs.seurat, "pca")
 
 # Extract the cluster assignments (assuming clustering is already done)
 clusters_mc <- Idents(MC.fs.seurat)
 
-so_16 <- Seurat::Load10X_Spatial("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_016um")
+so_16 <- Seurat::Load10X_Spatial("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_016um")
 so_16 <- SetAssayData(so_16, layer = "data", GetAssayData(so_16,layer = "counts"))
 so_16 <- FindVariableFeatures(so_16)
 so_16 <- ScaleData(so_16,do.scale = F,do.center = F)
@@ -603,10 +601,10 @@ so_16 <- RunPCA(so_16,)
 so_16 <- FindNeighbors(so_16,)
 so_16 <- FindClusters(so_16,resolution = 0.5)
 so_16 <- RunUMAP(so_16,dims = 1:30)
-jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_vis_16.jpeg"),width = 1920,height = 1080,quality = 100)
+jpeg(file=paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/umap_vis_16.jpeg"),width = 1920,height = 1080,quality = 100)
 plot(DimPlot(so_16))
 dev.off()
-saveRDS(so_16,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/so_16.rds")
+saveRDS(so_16,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/so_16.rds")
 pca_embeddings_16 <- Embeddings(so_16, "pca")
 
 # Extract the cluster assignments (assuming clustering is already done)
@@ -634,7 +632,7 @@ for (i in 1:num_batches) {
 avg_silhouette_score_mc <- mean(silhouette_scores_mc)
 
 print(paste("Average Silhouette Score:", avg_silhouette_score_mc))
-saveRDS(avg_silhouette_score_mc,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_g64_fg.rds")
+saveRDS(avg_silhouette_score_mc,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_g64_fg.rds")
 
 set.seed(42)  # For reproducibility
 
@@ -654,4 +652,4 @@ for (i in 1:num_batches) {
 avg_silhouette_score_16 <- mean(silhouette_scores_16)
 
 print(paste("Average Silhouette Score:", avg_silhouette_score_16))
-saveRDS(avg_silhouette_score_mc,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_16um_fg.rds")
+saveRDS(avg_silhouette_score_mc,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/sil_score_16um_fg.rds")

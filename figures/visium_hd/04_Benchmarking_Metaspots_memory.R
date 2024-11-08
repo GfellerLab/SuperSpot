@@ -213,7 +213,7 @@ RunMoransII <- function (data, pos, verbose = TRUE)
 
 processing <- function(g){
   print(paste0("gamma is: ",g))
-  obj <- readRDS(paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/MC_seurat_g",g,".rds"))
+  obj <- readRDS(paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/MC_seurat_g",g,".rds"))
   pos <- Seurat::GetTissueCoordinates(obj)
   cells.to.keep <- subset(pos, x < 22695.42/30, y < 65252.03/30)$cell
   print(length(cells.to.keep))
@@ -230,7 +230,7 @@ processing <- function(g){
   #jpeg(file=paste0("./01_Data/svf_mc_",g,".jpeg"),width = 3440,height = 1440)
   #plot(ImageFeaturePlot(obj, fov = "pancreas", features =  svf[1:6], max.cutoff = "q95"))
   #dev.off()
-  #save(svf,file = paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/svf_mc_",g,".rda"))
+  #save(svf,file = paste0("./SuperSpot/01_Data/svf_mc_",g,".rda"))
 }
 
 
@@ -245,10 +245,10 @@ mem.df <- peakRAM::peakRAM(
   processing(1))
 
 
-saveRDS(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/results_memory.rds")
-write.csv(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/results_memory.csv")
+saveRDS(mem.df,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/results_memory.rds")
+write.csv(mem.df,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/results_memory.csv")
 
-benchmark.results <- read_csv("/Users/admin/Documents/GitHub/SuperSpot/figures/visium_hd/results_memory.csv")
+benchmark.results <- read_csv("/./SuperSpot/figures/visium_hd/results_memory.csv")
 benchmark.results$Peak_RAM_Used_GB <- (benchmark.results$Peak_RAM_Used_MiB)/953.7
 benchmark.results$Elapsed_Time_hour <- (benchmark.results$Elapsed_Time_sec)/3600
 plot(c(64,32,16,8,4,2,1),benchmark.results$Peak_RAM_Used_GB,type = "b")

@@ -14,26 +14,26 @@ library(Rfast2)
 
 processing <- function(g){
   print(paste0("gamma is: ",g))
-  obj <- readRDS(paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumMouseBrain/MC_seurat_g",g,".rds"))
+  obj <- readRDS(paste0("./SuperSpot/VisiumMouseBrain/MC_seurat_g",g,".rds"))
   obj <- SCTransform(obj,return.only.var.genes = T)
-  
-  
-  
+
+
+
   print("Computing SVF")
   obj <- FindSpatiallyVariableFeatures(obj,assay = "SCT" ,features = VariableFeatures(obj)[1:1000],selection.method = "moransi")
   #svf.df_sorted <- obj@assays[["SCT"]]@meta.data[order(obj@assays[["SCT"]]@meta.data$moransi.spatially.variable.rank, decreasing = F), ]
   #svf_log_norm <- svf.df_sorted$var.features
   print("Done")
   #print(paste0("top 10 svf are: ",svf_log_norm[1:10]))
-  #jpeg(file=paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/BCBA/Output/svf_mc_",g,".jpeg"),width = 3440,height = 1440)
+  #jpeg(file=paste0("./SuperSpot/BCBA/Output/svf_mc_",g,".jpeg"),width = 3440,height = 1440)
   #jpeg(file=paste0("/Volumes/Analyses/Thèse/2023/data/umap_mc_spl_",g,".jpeg"))
   #plot(ImageFeaturePlot(obj, fov = "pancreas", features =  svf_log_norm[1:5], max.cutoff = "q95"))
   #dev.off()
-  #save(svf_log_norm,file = paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/BCBA/Output/svf_mc_log_norm_",g,".rda"))
+  #save(svf_log_norm,file = paste0("./SuperSpot/BCBA/Output/svf_mc_log_norm_",g,".rda"))
 }
 
 #time_df <- tibble::tibble(starting_times = starting_times, ending_times = ending_times)
-#write.csv(time_df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/01_Data/time_results.csv")
+#write.csv(time_df,"./SuperSpot/01_Data/time_results.csv")
 
 
 
@@ -65,5 +65,5 @@ mem.df <- peakRAM::peakRAM(
   processing(25))
 
 
-saveRDS(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumMouseBrain/results_memory_log_norm.rds")
-write.csv(mem.df,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumMouseBrain/results_memory_log_norm.csv")
+saveRDS(mem.df,"./SuperSpot/VisiumMouseBrain/results_memory_log_norm.rds")
+write.csv(mem.df,"./SuperSpot/VisiumMouseBrain/results_memory_log_norm.csv")

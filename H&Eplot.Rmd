@@ -1,0 +1,183 @@
+---
+title: "Untitled"
+author: "Matei Teleman"
+date: "2024-09-23"
+output: html_document
+---
+
+```{r}
+hires_scalef <- 0.0797
+lowres_scalef <- 0.00797
+
+positions_in_tissue$imagerow_hires <- positions_in_tissue$pxl_row_in_fullres * hires_scalef
+positions_in_tissue$imagecol_hires <- positions_in_tissue$pxl_col_in_fullres * hires_scalef
+```
+
+```{r}
+# Get the minimum and maximum coordinates in high-resolution image coordinates
+x_min <- min(positions_in_tissue$imagecol_hires)
+x_max <- max(positions_in_tissue$imagecol_hires)
+y_min <- min(positions_in_tissue$imagerow_hires)
+y_max <- max(positions_in_tissue$imagerow_hires)
+
+print(paste("Adjusted x_min:", x_min))
+print(paste("Adjusted x_max:", x_max))
+print(paste("Adjusted y_min:", y_min))
+print(paste("Adjusted y_max:", y_max))
+
+# Get the minimum and maximum coordinates in high-resolution image coordinates
+# Get image dimensions
+img_height <- dim(img)[1]
+
+# Adjust y indices for image array (invert y-axis)
+# y_min_img <- img_height - y_max + 1
+# y_max_img <- img_height - y_min + 1
+# x_min_img <- img_height - x_max + 1
+# x_max_img <- img_height - x_min + 1
+
+# Round indices to integers
+x_min_img <- max(1, round(x_min))
+x_max_img <- min(dim(img)[2], round(x_max))
+y_min_img <- max(1, round(y_min_img))
+y_max_img <- min(dim(img)[1], round(y_max_img))
+```
+
+```{r}
+# Subset the image
+cropped_img <- img[y_min_img:y_max_img, x_min_img:x_max_img, ]
+cropped_img <- img[0:1810, 3236:5201, ]
+plot(as.raster(cropped_img))
+```
+
+```{r}
+ggplot() +
+  annotation_raster(as.raster(cropped_img), xmin = 3236, xmax = 5201, ymin = 0, ymax = 1810) +
+  geom_polygon(
+    data = fg_mc$polygons,
+    mapping = aes(x = x * hires_scalef, y = -y * hires_scalef + 1810, group = membership),
+    alpha = 0,
+    color = "black",
+    linetype = "solid"
+  ) +
+  coord_fixed() + 
+  theme_minimal()
+```
+
+```{r}
+SpatialDimPlot(so_16,pt.size.factor = 0) +
+  geom_polygon(
+    data = fg_mc$polygons,
+    mapping = aes(x = x, y = y, group = membership),
+    alpha = 0,
+    color = "black",
+    linetype = "solid"
+  )
+```
+
+```{r}
+test <- SpatialExperiment::read10xVisium(samples = "/Users/admin/Documents/These/data/VisiumHDColonCancer/binned_outputs/square_016um",type = c("HDF5", "sparse"),data = c("filtered", "raw"),images = "hires",load = TRUE)
+```
+
+```{r}
+poly_8um <- readRDS("/Users/admin/Documents/GitHub/SuperSpot/figures/visium_hd/MC_spl_g16_fg.rds")$polygons
+poly_8um$imagecol <- poly_8um$x
+poly_8um$imagerow <- poly_8um$y
+poly_8um$x <- poly_8um$imagerow
+poly_8um$y <- poly_8um$imagecol
+ggplot() +
+  annotation_raster(as.raster(cropped_img), xmin = 3236, xmax = 5201, ymin = 0, ymax = 1810) +
+  geom_polygon(
+    data = poly_8um,
+    mapping = aes(x = x * hires_scalef, y = -y * hires_scalef + 1810, group = membership),
+    alpha = 0,
+    color = "black",
+    linetype = "solid"
+  ) +
+  coord_fixed() + 
+  theme_minimal()
+```
+
+```{r}
+positions<- arrow::read_parquet("/Users/admin/Documents/These/data/VisiumHDMouseBrain/binned_outputs/square_002um/spatial/tissue_positions.parquet") %>% column_to_rownames("barcode")
+positions_in_tissue <- subset(positions, in_tissue == 1)
+
+hires_scalef <- 0.2505533
+lowres_scalef <- 0.02505533
+
+positions_in_tissue$imagerow_hires <- positions_in_tissue$pxl_row_in_fullres * hires_scalef
+positions_in_tissue$imagecol_hires <- positions_in_tissue$pxl_col_in_fullres * hires_scalef
+```
+
+```{r}
+# Get the minimum and maximum coordinates in high-resolution image coordinates
+x_min <- min(positions_in_tissue$imagecol_hires)
+x_max <- max(positions_in_tissue$imagecol_hires)
+y_min <- min(positions_in_tissue$imagerow_hires)
+y_max <- max(positions_in_tissue$imagerow_hires)
+
+print(paste("Adjusted x_min:", x_min))
+print(paste("Adjusted x_max:", x_max))
+print(paste("Adjusted y_min:", y_min))
+print(paste("Adjusted y_max:", y_max))
+
+# Get the minimum and maximum coordinates in high-resolution image coordinates
+# Get image dimensions
+img <- readPNG("/Users/admin/Documents/These/data/VisiumHDMouseBrain/binned_outputs/square_002um/spatial/tissue_hires_image.png")
+img_height <- dim(img)[1]
+
+# Adjust y indices for image array (invert y-axis)
+# y_min_img <- img_height - y_max + 1
+# y_max_img <- img_height - y_min + 1
+# x_min_img <- img_height - x_max + 1
+# x_max_img <- img_height - x_min + 1
+
+# Round indices to integers
+x_min_img <- max(1, round(x_min))
+x_max_img <- min(dim(img)[2], round(x_max))
+y_min_img <- max(1, round(y_min_img))
+y_max_img <- min(dim(img)[1], round(y_max_img))
+```
+
+```{r}
+cropped_img <- img[round(y_min):round(y_max), round(x_min):round(x_max), ]
+plot(as.raster(cropped_img))
+```
+
+```{r}
+poly_8um <- readRDS("/Users/admin/Documents/These/data/VisiumHDMouseBrain/MC_spl_g16_fg.rds")$polygons
+poly_8um$imagecol <- poly_8um$x
+poly_8um$imagerow <- poly_8um$y
+poly_8um$x <- poly_8um$imagerow
+poly_8um$y <- poly_8um$imagecol
+ggplot() +
+  annotation_raster(as.raster(cropped_img), xmin = round(x_min), xmax = round(x_max), ymin = round(y_min), ymax = round(y_max)) +
+  geom_polygon(
+    data = poly_8um,
+    mapping = aes(x = x * hires_scalef, y = -y * hires_scalef + round(y_max) +  round(y_min), group = membership),
+    alpha = 0,
+    color = "black",
+    linetype = "solid",
+    linewidth = 0.1
+  ) +
+  coord_fixed() + 
+  theme_minimal()
+
+poly_16um <- readRDS("/Users/admin/Documents/These/data/VisiumHDMouseBrain/MC_spl_g64_fg.rds")$polygons
+poly_16um$imagecol <- poly_16um$x
+poly_16um$imagerow <- poly_16um$y
+poly_16um$x <- poly_16um$imagerow
+poly_16um$y <- poly_16um$imagecol
+ggplot() +
+  annotation_raster(as.raster(cropped_img), xmin = round(x_min), xmax = round(x_max), ymin = round(y_min), ymax = round(y_max)) +
+  geom_polygon(
+    data = poly_16um,
+    mapping = aes(x = x * hires_scalef, y = -y * hires_scalef + round(y_max) +  round(y_min), group = membership),
+    alpha = 0,
+    color = "black",
+    linetype = "solid",
+    linewidth = 0.1
+  ) +
+  coord_fixed() + 
+  theme_minimal()
+```
+

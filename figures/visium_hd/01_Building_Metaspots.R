@@ -234,13 +234,12 @@ SCimplify_SpatialDLS_HD <- function(X,
 
 
 ## Import data
-spotPositions <- arrow::read_parquet("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet") %>% column_to_rownames("barcode")
+spotPositions <- arrow::read_parquet("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet") %>% column_to_rownames("barcode")
 spotPositions.filt <- subset(spotPositions, in_tissue == 1)
 rm(spotPositions)
-#mtx.count <- Seurat::Read10X_h5("/Users/admin/Downloads/square_008um/filtered_feature_bc_matrix.h5")
-mtx.count <- Seurat::Read10X_h5("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5")
-#mtx.count <- open_matrix_10x_hdf5("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5", feature_type="Gene Expression") %>%
-#write_matrix_dir("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix_raw")
+mtx.count <- Seurat::Read10X_h5("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5")
+#mtx.count <- open_matrix_10x_hdf5("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix.h5", feature_type="Gene Expression") %>%
+#write_matrix_dir("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/filtered_feature_bc_matrix_raw")
 spotPositions.filt <- spotPositions.filt[colnames(mtx.count),c("pxl_col_in_fullres","pxl_row_in_fullres")]
 colnames(spotPositions.filt) <- c("imagecol","imagerow")
 
@@ -273,7 +272,7 @@ for (g in c(64,32,16,8,4,2,1)){
   #                                                annotation = "cell_type",
   #                                                concavity = 2,membership_name = "membership")
   MC.spl$centroids <- supercell_spatial_centroids(MC = MC.spl,spotPositions = spotPositions.filt)
-  #saveRDS(MC.spl,"/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g16_fg.rds")
+  #saveRDS(MC.spl,"./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/MC_spl_g16_fg.rds")
 
   MC.fs.ge <- superspot_GE(MC = MC.spl,
                            ge = mtx.count, #%>% as.matrix(),
@@ -292,8 +291,8 @@ for (g in c(64,32,16,8,4,2,1)){
   MC.fs.seurat <- FindVariableFeatures(MC.fs.seurat)
   MC.fs.seurat <- ScaleData(MC.fs.seurat,do.scale = F,do.center = F)
   #saveRDS(MC.seurat,file = paste0("./SuperSpot/01_Data/MC.seurat_g",g,".rds"))
-  #tissue_position  <- read.csv("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/BCBA/spatial/tissue_positions_list.csv",header = F)
-  #tissue_position  <- arrow::read_parquet("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet")
+  #tissue_position  <- read.csv("./SuperSpot/BCBA/spatial/tissue_positions_list.csv",header = F)
+  #tissue_position  <- arrow::read_parquet("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_positions.parquet")
   #MC_centroids <- supercell_spatial_centroids(MC,spotPositions = spotPosition)
   #tissue_position_sb <- subset(tissue_position, barcodes %in% names(MC.spl$membership))
   #tissue_position_sb$membership <- MC.spl$membership
@@ -309,8 +308,8 @@ for (g in c(64,32,16,8,4,2,1)){
 
   #metadata_mean$cell_ID <- metadata_mean$membership
 
-  image <- png::readPNG(source = "/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_lowres_image.png")
-  scale.factors <- Read10X_ScaleFactors(filename = "/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/scalefactors_json.json")
+  image <- png::readPNG(source = "./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/tissue_lowres_image.png")
+  scale.factors <- Read10X_ScaleFactors(filename = "./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/binned_outputs/square_002um/spatial/scalefactors_json.json")
   #coordinates <- tissue_position_mean[,1:6]
   #coordinates <- column_to_rownames(coordinates,var = "membership")
   #colnames(coordinates) <- c("tissue","row","col","imagerow","imagecol")
@@ -336,7 +335,7 @@ for (g in c(64,32,16,8,4,2,1)){
   #counts.matrix_ms <- counts.matrix_ms[columns_to_keep]
 
   #write_csv(x=counts.matrix_ms,file = paste0("./SuperSpot/01_Data/PancreasCosMx/count_ms_g",g,".csv"))
-  saveRDS(MC.fs.seurat,file = paste0("/work/FAC/FBM/LLB/dgfeller/scrnaseq/mteleman/SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/MC_seurat_g",g,".rds"))
+  saveRDS(MC.fs.seurat,file = paste0("./SuperSpot/VisiumHD/01_Data/VisiumHDColonCancer/benchmarking/MC_seurat_g",g,".rds"))
 }
 
 #write.csv(metad,"./SuperSpot/01_Data/metad.csv")
