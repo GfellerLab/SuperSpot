@@ -49,6 +49,30 @@ supercell_metaspots_shape <- function(MC, spotpositions,annotation,concavity,mem
   return(hull_df_final)
 }
 
+#' Creation of polygons around the metaspots (upgrade)
+#'
+#' This function detects creates of around the metaspots based of the memberships of spots
+#'
+#'
+#' @param MC Metaspot object obtained from SCimplify_SpatialDLS function
+#' @param spotpositions a data.frame of the coordinates of the spots
+#' @param annotation a vector of the annotation for each spot
+#' @param concavity a number to define the concavity of the polygons
+#' @param membership_name a character of the name where the memberships have been stored in the MC object
+#'
+#' @return a dataframe with columns
+#' \itemize{
+#'   \item x - x coordinates of the polygons
+#'   \item y - y coordinates of the polygons
+#'   \item cell_type - annotation of the polygons
+#'   \item membership - membership of the polygons
+#' }
+#'
+#' @export
+#'
+#'
+#'
+
 supercell_metaspots_shape_v2 <- function(MC, spotpositions, annotation, concavity, membership_name = "membership") {
   message("Creating polygons for visualization")
 
