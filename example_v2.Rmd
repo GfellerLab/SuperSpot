@@ -3,8 +3,9 @@ title: "Vignette SuperSpot"
 author: "Matei Teleman"
 date: "2024-01-15"
 output:
-  pdf_document: default
+  md_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ## Import libraries
